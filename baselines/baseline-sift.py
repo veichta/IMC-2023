@@ -1,6 +1,7 @@
 import os
 import shutil
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -117,66 +118,49 @@ out_results = {}
 ds = [str(d) for d in data_dict.keys()] if MODE == "test" else ["heritage", "haiper", "urban"]
 
 # Run
-for dataset in ds:
-    print(dataset)
+out_results = data_dict.copy()
 
-    if dataset not in metrics:
-        metrics[dataset] = {}
 
-    if dataset not in out_results:
-        out_results[dataset] = {}
+def reconstruct_scene(image_dir):
+    try:
+        # extract global features
+        retrieval_features_path = Path("retrieval_features.h5")
+        if os.path.exists(retrieval_features_path):
+            os.remove(retrieval_features_path)
+        extract_features.main(
+            conf=extract_features.confs["netvlad"],
+            image_dir=image_dir,
+            feature_path=retrieval_features_path,
+        )
 
-    scenes = dataset_to_scenes[dataset]
-    for scene in data_dict[dataset]:
-        print(f"{dataset} - {scene}")
-
-        image_dir = Path(f"{DIR}/{MODE}/{dataset}/{scene}/images")
-        if not os.path.exists(image_dir):
-            continue
-
-        img_list = [Path(p).name for p in data_dict[dataset][scene]]
-
-        out_results[dataset][scene] = {}
-
-        # exhaustive retrieval
+        # get retrieval pairs
+        if len(os.listdir(image_dir)) <= 20:
+            n_retrieval = len(os.listdir(image_dir)) - 1
+        else:
+            n_retrieval = 20
         pairs_path = Path("pairs.txt")
         if os.path.exists(pairs_path):
             os.remove(pairs_path)
-
-        # pairs from retrieval
-        features_retrieval = Path("features_retrieval.h5")
-        if os.path.exists(features_retrieval):
-            os.remove(features_retrieval)
-
-        extract_features.main(
-            conf=extract_features.confs["netvlad"],  # "cosplace" or "netvlad"
-            image_dir=image_dir,
-            image_list=img_list,
-            feature_path=features_retrieval,
-        )
-
         pairs_from_retrieval.main(
-            descriptors=features_retrieval,
-            num_matched=min(len(img_list), N_RETRIEVAL),
+            descriptors=retrieval_features_path,
+            num_matched=n_retrieval,
             output=pairs_path,
         )
 
-        # feature extraction
+        # feature extraction & matching with LoFTR
         features_path = Path("features.h5")
         if os.path.exists(features_path):
             os.remove(features_path)
+        matches_path = Path("matches.h5")
+        if os.path.exists(matches_path):
+            os.remove(matches_path)
 
         extract_features.main(
             conf=feature_conf,
             image_dir=image_dir,
-            image_list=img_list,
             feature_path=features_path,
         )
 
-        # feature matching
-        matches_path = Path("matches.h5")
-        if os.path.exists(matches_path):
-            os.remove(matches_path)
         match_features.main(
             conf=matcher_conf,
             pairs=pairs_path,
@@ -191,48 +175,48 @@ for dataset in ds:
         sparse_model = reconstruction.main(
             sfm_dir=Path("sparse"),
             image_dir=image_dir,
-            image_list=img_list,
             pairs=pairs_path,
             features=features_path,
             matches=matches_path,
-            verbose=True,
+            verbose=False,
         )
 
         if sparse_model is None:
-            print(f"No model reconstructed for {dataset} - {scene}.")
-            metrics[dataset][scene] = {
-                "n_images": len(img_list),
-                "n_reg_images": 0,
-            }
+            return {}
+
+        results = {}
+        for _, im in sparse_model.images.items():
+            img_name = os.path.join(dataset, scene, "images", im.name)
+            results[img_name] = {}
+            results[img_name]["R"] = np.array(im.rotmat())
+            results[img_name]["t"] = np.array(im.tvec)
+        return results
+
+    except Exception as e:
+        print(e)
+        print(f"{dataset} - {scene} failed.")
+        return {}
+
+
+executor = ProcessPoolExecutor(1)
+for dataset in data_dict:
+    print(dataset)
+
+    if dataset not in out_results:
+        out_results[dataset] = {}
+
+    scenes = dataset_to_scenes[dataset]
+    for scene in data_dict[dataset]:
+        print(f"{dataset} - {scene}")
+        image_dir = Path(f"{DIR}/{MODE}/{dataset}/{scene}/images")
+        if not os.path.exists(image_dir):
             continue
 
-        metrics[dataset][scene] = {
-            "n_images": len(img_list),
-            "n_reg_images": sparse_model.num_reg_images(),
-        }
-
-        # save results of current scene
-        print(f"Extracting results for {dataset} - {scene}")
-        for _, im in sparse_model.images.items():
-            # print(im)
-            img_name = os.path.join(dataset, scene, "images", im.name)
-            out_results[dataset][scene][img_name] = {"R": im.rotmat(), "t": im.tvec}
-        print("Done...")
-
-        # save results of all scenes so far
-        # print(f"Writing results for {dataset} - {scene}")
-        # create_submission(out_results, data_dict)
-        # print("Done...")
-
-        print(f"Cleaning up {dataset} - {scene}")
-        print("Done...")
-
-for dataset in metrics:
-    print(dataset)
-    for scene in metrics[dataset]:
-        print(
-            f"\t{scene}: {metrics[dataset][scene]['n_reg_images']} / {metrics[dataset][scene]['n_images']}"
-        )
+        future = executor.submit(reconstruct_scene, image_dir)
+        try:
+            out_results[dataset][scene] = future.result()
+        except Exception as e:
+            print(f"Subprocess for {dataset} - {scene} died.")
 
 create_submission(out_results, data_dict)
 

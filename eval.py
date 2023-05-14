@@ -1,9 +1,15 @@
+import argparse
 from dataclasses import dataclass
 from time import time
 
 # Eval train submission
 # https://www.kaggle.com/code/eduardtrulls/imc2023-evaluation
 import numpy as np
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--submission", type=str, default="submission.csv")
+parser.add_argument("--dir", type=str, default=".")
+args = parser.parse_args()
 
 
 # Conveniency functions.
@@ -201,11 +207,7 @@ translation_thresholds_meters_dict = {
 }
 
 # Generate and evaluate a random submission.
-
-# src = "/kaggle/input/image-matching-challenge-2023"
-src = "/cluster/project/infk/courses/252-0579-00L/group01/image-matching-challenge-2023"
-
-with open(f"{src}/train/train_labels.csv", "r") as fr, open("ground_truth.csv", "w") as fw:
+with open(f"{args.dir}/train/train_labels.csv", "r") as fr, open("ground_truth.csv", "w") as fw:
     for i, l in enumerate(fr):
         if i == 0:
             fw.write("image_path,dataset,scene,rotation_matrix,translation_vector\n")
@@ -214,7 +216,7 @@ with open(f"{src}/train/train_labels.csv", "r") as fr, open("ground_truth.csv", 
             fw.write(f"{image},{dataset},{scene},{R},{T}\n")
 
 eval_submission(
-    submission_csv_path="submission.csv",
+    submission_csv_path=args.submission,
     ground_truth_csv_path="ground_truth.csv",
     rotation_thresholds_degrees_dict=rotation_thresholds_degrees_dict,
     translation_thresholds_meters_dict=translation_thresholds_meters_dict,

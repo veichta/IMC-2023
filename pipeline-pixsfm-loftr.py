@@ -103,7 +103,7 @@ def create_submission(out_results, data_dict):
 # Configs
 N_RETRIEVAL = 20
 retrieval_conf = extract_features.confs["netvlad"]  # "cosplace" or "netvlad"
-feature_conf = extract_features.confs["superpoint_max"]
+# feature_conf = extract_features.confs["superpoint_max"]
 matcher_conf = {
     "output": "matches-loftr",
     "model": {"name": "loftr", "weights": "outdoor"},
@@ -120,7 +120,9 @@ out_results = {}
 
 create_submission(out_results, data_dict)
 
-ds = [str(d) for d in data_dict.keys()] if MODE == "test" else ["heritage", "haiper", "urban"]
+ds = (
+    [str(d) for d in data_dict.keys()] if MODE == "test" else ["phototourism"]
+)  # ["heritage", "haiper", "urban"]
 
 for dataset in ds:
     print(dataset)
@@ -223,7 +225,7 @@ for dataset in ds:
             out_results[dataset][scene][img_name]["t"] = im.tvec
 
         # save results of all scenes so far
-        create_submission(out_results, data_dict)
+        # create_submission(out_results, data_dict)
         gc.collect()
 
         # except Exception as e:

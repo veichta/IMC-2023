@@ -221,8 +221,8 @@ for dataset in ds:
             # print(im)
             img_name = os.path.join(dataset, scene, "images", im.name)
             out_results[dataset][scene][img_name] = {}
-            out_results[dataset][scene][img_name]["R"] = im.rotmat()
-            out_results[dataset][scene][img_name]["t"] = im.tvec
+            out_results[dataset][scene][img_name]["R"] = np.array(im.rotmat())
+            out_results[dataset][scene][img_name]["t"] = np.array(im.tvec)
 
         # save results of all scenes so far
         create_submission(out_results, data_dict)

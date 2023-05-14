@@ -103,8 +103,8 @@ def create_submission(out_results, data_dict):
 # Configs
 N_RETRIEVAL = 50
 retrieval_conf = extract_features.confs["netvlad"]  # "cosplace" or "netvlad"
-feature_conf = extract_features.confs["superpoint_max"]
-matcher_conf = match_features.confs["superglue"]
+feature_conf = extract_features.confs["sift"]
+matcher_conf = match_features.confs["NN-ratio"]
 ref_conf = OmegaConf.load(pixsfm.configs.parse_config_path("low_memory"))
 
 

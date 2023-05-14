@@ -1,45 +1,90 @@
+import json
 import os
+import pickle
 import sys
 from pathlib import Path
 
 import numpy as np
+import pixsfm
 import pycolmap
-from hloc import extract_features, match_features, match_dense, pairs_from_retrieval, reconstruction
-import pickle
-import json
+from hloc import extract_features, match_dense, match_features, pairs_from_retrieval, reconstruction
+from omegaconf import OmegaConf
+from pixsfm.refine_hloc import PixSfM
 
 sys.path.append("/kaggle/working/superglue/superglue")
 
 # DIR = "/kaggle/input/image-matching-challenge-2023"
-# DIR = "/cluster/project/infk/courses/252-0579-00L/group01/image-matching-challenge-2023"
-DIR = "image-matching-challenge-2023"
+DIR = "/cluster/project/infk/courses/252-0579-00L/group01/image-matching-challenge-2023"
+# DIR = "image-matching-challenge-2023"
 MODE = "train"  # "train", "test"
+
+CACHE_DIR = "/cluster/scratch/veichta/pixsfm/cache"
 
 # Configs
 
-configs = {
-    'sift+NN': {
-        'features': extract_features.confs["sift"],
-        'matches': match_features.confs["NN-ratio"],
-        'retrieval': extract_features.confs["netvlad"],
-        'n_retrieval': 50,
+#     "features": {
+#         "model": {"name": "dog"},
+#         "options": {
+#             "first_octave": -1,
+#             "peak_threshold": 0.01,
+#         },
+#         "output": "feats-sift",
+#         "preprocessing": {"grayscale": True, "resize_max": 1600},
+#     },
 
+configs = {
+    "sift+NN": {
+        "features": extract_features.confs["sift"],
+        "matches": match_features.confs["NN-ratio"],
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
     },
-    'loftr': {
-        'features': None,
-        'matches': {
+    "loftr20": {
+        "features": None,
+        "matches": {
             "output": "matches-loftr",
             "model": {"name": "loftr", "weights": "outdoor"},
             "preprocessing": {"grayscale": True, "resize_max": 840, "dfactor": 8},  # 1024,
             "max_error": 1,  # max error for assigned keypoints (in px)
             "cell_size": 1,  # size of quantization patch (max 1 kp/patch)
         },
-        'retrieval': extract_features.confs["netvlad"],
-        'n_retrieval': 20,
-    }
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 20,
+    },
+    "loftr50": {
+        "features": None,
+        "matches": {
+            "output": "matches-loftr",
+            "model": {"name": "loftr", "weights": "outdoor"},
+            "preprocessing": {"grayscale": True, "resize_max": 840, "dfactor": 8},  # 1024,
+            "max_error": 1,  # max error for assigned keypoints (in px)
+            "cell_size": 1,  # size of quantization patch (max 1 kp/patch)
+        },
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
+    "SP+SG": {
+        "features": extract_features.confs["superpoint_max"],
+        "matches": match_features.confs["superglue"],
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
+    "SP+SG+cos": {
+        "features": extract_features.confs["superpoint_max"],
+        "matches": match_features.confs["superglue"],
+        "retrieval": extract_features.confs["cosplace"],
+        "n_retrieval": 50,
+    },
+    "disk": {
+        "features": extract_features.confs["disk"],
+        "matches": match_features.confs["NN-ratio"],
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
 }
 
-NAME = "loftr"
+# add -pixsfm for pixsfm
+NAME = "SP+SG"  # + "-pixsfm"
 
 
 # Data Dict
@@ -300,21 +345,26 @@ def eval_submission(
 
     return np.mean(metrics_per_dataset)
 
+
 # create_submission(out_results, data_dict)
-ds = [str(d) for d in data_dict.keys()] if MODE == "test" else ["heritage", "haiper", "urban"]
+ds = [str(d) for d in data_dict.keys()]  # if MODE == "test" else ["heritage", "haiper", "urban"]
 
-conf = configs[NAME]
+conf = configs[NAME.split("-")[0]]
 
-out_dir = Path(f'outputs/{NAME}')
+
+out_dir = Path(f"outputs/{NAME}")
 out_dir.mkdir(exist_ok=True, parents=True)
 
-metrics_path = out_dir / 'metrics.pickle'
-results_path = out_dir / 'results.pickle'
+metrics_path = out_dir / "metrics.pickle"
+results_path = out_dir / "results.pickle"
 
 submission_csv_path = out_dir / "submission.csv"
 
 with open(str(out_dir / "config.json"), "w") as jf:
     json.dump(conf, jf, indent=4)
+
+if NAME.endswith("pixsfm"):
+    conf["refinements"] = OmegaConf.load(pixsfm.configs.parse_config_path("low_memory"))
 
 # Setup
 metrics = {}
@@ -344,10 +394,10 @@ for dataset in ds:
         scene_dir.mkdir(parents=True, exist_ok=True)
 
         sfm_dir = scene_dir / "sparse"
-        pairs_path = scene_dir / 'pairs.txt'
+        pairs_path = scene_dir / "pairs.txt"
         features_retrieval = scene_dir / "features_retrieval.h5"
         features_path = scene_dir / "features.h5"
-        matches_path = scene_dir / 'matches.h5'
+        matches_path = scene_dir / "matches.h5"
 
         img_list = [Path(p).name for p in data_dict[dataset][scene]]
 
@@ -355,7 +405,7 @@ for dataset in ds:
 
         # exhaustive retrieval
         extract_features.main(
-            conf=conf['retrieval'],
+            conf=conf["retrieval"],
             image_dir=image_dir,
             image_list=img_list,
             feature_path=features_retrieval,
@@ -363,14 +413,14 @@ for dataset in ds:
 
         pairs_from_retrieval.main(
             descriptors=features_retrieval,
-            num_matched=min(len(img_list), conf['n_retrieval']),
+            num_matched=min(len(img_list), conf["n_retrieval"]),
             output=pairs_path,
         )
 
-        if conf['features'] is not None:
+        if conf["features"] is not None:
             # feature extraction
             extract_features.main(
-                conf=conf['features'],
+                conf=conf["features"],
                 image_dir=image_dir,
                 image_list=img_list,
                 feature_path=features_path,
@@ -378,19 +428,19 @@ for dataset in ds:
 
             # feature matching
             match_features.main(
-                conf=conf['matches'],
+                conf=conf["matches"],
                 pairs=pairs_path,
                 features=features_path,
                 matches=matches_path,
             )
         else:
             match_dense.main(
-            conf=conf['matches'],
-            image_dir=image_dir,
-            pairs=pairs_path,
-            features=features_path,
-            matches=matches_path,
-        )
+                conf=conf["matches"],
+                image_dir=image_dir,
+                pairs=pairs_path,
+                features=features_path,
+                matches=matches_path,
+            )
 
         # structure-from-motion
         if sfm_dir.exists():
@@ -398,6 +448,23 @@ for dataset in ds:
                 sparse_model = pycolmap.Reconstruction(sfm_dir)
             except ValueError:
                 sparse_model = None
+
+        elif NAME.endswith("pixsfm"):
+            cache_path = Path(os.path.join(CACHE_DIR, scene))
+            if not os.path.exists(cache_path):
+                os.makedirs(cache_path)
+
+            refiner = PixSfM(conf=conf["refinements"])
+            sparse_model, outputs = refiner.run(
+                output_dir=sfm_dir,
+                image_dir=image_dir,
+                pairs_path=pairs_path,
+                features_path=features_path,
+                matches_path=matches_path,
+                cache_path=cache_path,
+                verbose=False,
+            )
+
         else:
             sparse_model = reconstruction.main(
                 sfm_dir=sfm_dir,
@@ -411,7 +478,44 @@ for dataset in ds:
             if sparse_model is not None:
                 sparse_model.write(sfm_dir)
 
-        if sparse_model is None:
+        if sparse_model is None and NAME != "sift+NN":
+            # try sift pipeline
+            print("No model reconstructed.")
+            print("Try to reconstruct with sift pipeline...")
+
+            features_path = scene_dir / "sift.h5"
+            matches_path = scene_dir / "nn-ratio.h5"
+
+            # feature extraction
+            extract_features.main(
+                conf=extract_features.confs["sift"],
+                image_dir=image_dir,
+                image_list=img_list,
+                feature_path=features_path,
+            )
+
+            # feature matching
+            match_features.main(
+                conf=match_features.confs["NN-ratio"],
+                pairs=pairs_path,
+                features=features_path,
+                matches=matches_path,
+            )
+
+            # structure-from-motion
+            sparse_model = reconstruction.main(
+                sfm_dir=sfm_dir,
+                image_dir=image_dir,
+                image_list=img_list,
+                pairs=pairs_path,
+                features=features_path,
+                matches=matches_path,
+                verbose=False,
+            )
+
+        if sparse_model is not None:
+            sparse_model.write(sfm_dir)
+        else:
             print(f"No model reconstructed for {dataset} - {scene}.")
             metrics[dataset][scene] = {
                 "n_images": len(img_list),
@@ -433,15 +537,17 @@ for dataset in ds:
             out_results[dataset][scene][img_name] = {"R": im.rotmat(), "t": np.array(im.tvec)}
         print("Done...")
 
-        with open(metrics_path, 'wb') as handle:
+        with open(metrics_path, "wb") as handle:
             pickle.dump(metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(results_path, 'wb') as handle:
+        with open(results_path, "wb") as handle:
             pickle.dump(out_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-with open(metrics_path, 'rb') as handle:
+with open(metrics_path, "rb") as handle:
     metrics = pickle.load(handle)
-with open(results_path, 'rb') as handle:
+with open(results_path, "rb") as handle:
     out_results = pickle.load(handle)
+
+create_submission(out_results, data_dict, submission_csv_path)
 
 for dataset in metrics:
     print(dataset)
@@ -450,7 +556,6 @@ for dataset in metrics:
             f"\t{scene}: {metrics[dataset][scene]['n_reg_images']} / {metrics[dataset][scene]['n_images']}"
         )
 
-create_submission(out_results, data_dict, submission_csv_path)
 
 # Set rotation thresholds per scene.
 
