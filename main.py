@@ -1,9 +1,12 @@
+import sys
+
+sys.path.append("ext_deps/Hierarchical-Localization")
+
 import argparse
 import json
 import logging
 import os
 import pickle
-import sys
 from pathlib import Path
 
 import numpy as np
