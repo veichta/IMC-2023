@@ -26,11 +26,17 @@ parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
 
-logging.basicConfig(
-    format="[%(asctime)s %(name)s %(levelname)s] %(message)s",
-    datefmt="%Y/%m/%d %H:%M:%S",
-    level=logging.INFO,
+formatter = logging.Formatter(
+    fmt="[%(asctime)s %(name)s %(levelname)s] %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
 )
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+handler.setLevel(logging.INFO)
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
+logger.propagate = False
 
 # SETTINGS
 MODE = args.mode  # "train" or "test"
