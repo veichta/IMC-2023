@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import os
@@ -17,15 +18,23 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
+# PARSE ARGS
+parser = argparse.ArgumentParser()
+parser.add_argument("--mode", type=str, choices=["train", "test"], help="train or test")
+parser.add_argument("--config", type=str, choices=configs.keys(), help="config name")
+parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
+parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
+args = parser.parse_args()
 
 # SETTINGS
-MODE = "train"  # "train" or "test"
-CONF_NAME = "sift+NN"
-PIXSFM = False
-OVERWRITE = False
+MODE = args.mode  # "train" or "test"
+CONF_NAME = args.config
+PIXSFM = args.pixsfm
+OVERWRITE = args.overwrite
 
 # PATHS
-data_dir = Path("image-matching-challenge-2023")
+# Path("image-matching-challenge-2023")
+data_dir = Path("/cluster/scratch/veichta/image-matching-challenge-2023")
 submission_dir = Path("submission.csv")
 output_dir = Path(f"outputs/{CONF_NAME}")
 output_dir.mkdir(exist_ok=True, parents=True)
@@ -145,6 +154,7 @@ with open(results_path, "rb") as handle:
     out_results = pickle.load(handle)
 
 create_submission(out_results, data_dict, submission_csv_path)
+create_submission(out_results, data_dict, "submission.csv")
 
 for dataset in metrics:
     print(dataset)
@@ -155,4 +165,4 @@ for dataset in metrics:
 
 # EVALUATE
 if MODE == "train":
-    eval(submission_csv=submission_csv_path, data_dir=data_dir)
+    eval(submission_csv="submission.csv", data_dir=data_dir)
