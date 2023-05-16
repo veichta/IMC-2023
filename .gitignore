@@ -3,6 +3,14 @@ image-matching-challenge-2023/**
 **.DS_Store
 **.csv
 
+outputs/**
+outputs_old/**
+
+**.jpg
+**.png
+**.svg
+**.gif
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -131,3 +139,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+/outputs/
