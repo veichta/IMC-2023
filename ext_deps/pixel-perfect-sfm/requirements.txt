@@ -1,0 +1,12 @@
+git+https://github.com/colmap/pycolmap
+git+https://github.com/cvg/pyceres
+torch>=1.7
+torchvision>=0.8
+numpy
+tqdm>=4.36.0
+matplotlib
+plotly
+scipy
+h5py
+omegaconf
+packaging
