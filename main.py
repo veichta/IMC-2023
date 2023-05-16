@@ -15,12 +15,6 @@ from imc2023.configs import configs
 from imc2023.utils.eval import eval
 from imc2023.utils.utils import DataPaths, create_submission, get_data_from_dict, get_data_from_dir
 
-logging.basicConfig(
-    format="[%(asctime)s %(name)s %(levelname)s] %(message)s",
-    datefmt="%Y/%m/%d %H:%M:%S",
-    level=logging.INFO,
-)
-
 # PARSE ARGS
 parser = argparse.ArgumentParser()
 parser.add_argument("--data", type=str, required=True, help="imc dataset")
@@ -31,6 +25,12 @@ parser.add_argument(
 parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
+
+logging.basicConfig(
+    format="[%(asctime)s %(name)s %(levelname)s] %(message)s",
+    datefmt="%Y/%m/%d %H:%M:%S",
+    level=logging.INFO,
+)
 
 # SETTINGS
 MODE = args.mode  # "train" or "test"
@@ -163,9 +163,9 @@ create_submission(out_results, data_dict, submission_csv_path)
 create_submission(out_results, data_dict, "submission.csv")
 
 for dataset in metrics:
-    print(dataset)
+    logging.info(dataset)
     for scene in metrics[dataset]:
-        print(
+        logging.info(
             f"\t{scene}: {metrics[dataset][scene]['n_reg_images']} / {metrics[dataset][scene]['n_images']}"
         )
 

@@ -57,7 +57,7 @@ class Pipeline:
         self.log_step("Get pairs")
 
         if self.paths.pairs_path.exists() and not self.overwrite:
-            print(f"Pairs already at {self.paths.pairs_path}")
+            logging.info(f"Pairs already at {self.paths.pairs_path}")
         else:
             extract_features.main(
                 conf=self.config["retrieval"],
@@ -67,7 +67,7 @@ class Pipeline:
             )
 
         if self.paths.pairs_path.exists() and not self.overwrite:
-            print(f"Pairs already at {self.paths.pairs_path}")
+            logging.info(f"Pairs already at {self.paths.pairs_path}")
             return
 
         pairs_from_retrieval.main(

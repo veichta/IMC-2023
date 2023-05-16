@@ -1,3 +1,5 @@
+import logging
+
 from hloc import extract_features, match_features
 
 from imc2023.pipelines.pipeline import Pipeline
@@ -9,7 +11,7 @@ class SparsePipeline(Pipeline):
         self.log_step("Extract features")
 
         if self.paths.features_path.exists():
-            print(f"Features already at {self.paths.features_path}")
+            logging.info(f"Features already at {self.paths.features_path}")
             return
 
         extract_features.main(
@@ -24,7 +26,7 @@ class SparsePipeline(Pipeline):
         self.log_step("Match features")
 
         if self.paths.matches_path.exists():
-            print(f"Matches already at {self.paths.matches_path}")
+            logging.info(f"Matches already at {self.paths.matches_path}")
             return
 
         match_features.main(

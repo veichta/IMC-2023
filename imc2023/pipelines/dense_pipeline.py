@@ -1,3 +1,5 @@
+import logging
+
 from hloc import match_dense
 
 from imc2023.pipelines.pipeline import Pipeline
@@ -13,7 +15,7 @@ class DensePipeline(Pipeline):
         self.log_step("Match features")
 
         if self.paths.matches_path.exists():
-            print(f"Matches already at {self.paths.matches_path}")
+            logging.info(f"Matches already at {self.paths.matches_path}")
             return
 
         match_dense.main(
