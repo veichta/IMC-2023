@@ -20,8 +20,11 @@ logging.basicConfig(
 
 # PARSE ARGS
 parser = argparse.ArgumentParser()
-parser.add_argument("--mode", type=str, choices=["train", "test"], help="train or test")
-parser.add_argument("--config", type=str, choices=configs.keys(), help="config name")
+parser.add_argument("--data", type=str, required=True, help="imc dataset")
+parser.add_argument("--config", type=str, required=True, choices=configs.keys(), help="config name")
+parser.add_argument(
+    "--mode", type=str, required=True, choices=["train", "test"], help="train or test"
+)
 parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
@@ -34,7 +37,7 @@ OVERWRITE = args.overwrite
 
 # PATHS
 # Path("image-matching-challenge-2023")
-data_dir = Path("/cluster/scratch/veichta/image-matching-challenge-2023")
+data_dir = Path(args.data)
 submission_dir = Path("submission.csv")
 output_dir = Path(f"outputs/{CONF_NAME}")
 output_dir.mkdir(exist_ok=True, parents=True)
