@@ -1,0 +1,10 @@
+Flask
+Pillow 
+loguru
+matplotlib
+numpy
+pandas
+scikit-learn
+tensorflow 
+tqdm
+transformers
