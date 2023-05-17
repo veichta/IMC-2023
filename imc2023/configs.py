@@ -37,6 +37,35 @@ configs = {
         "retrieval": extract_features.confs["netvlad"],
         "n_retrieval": 50,
     },
+    "SP+LG": {
+        "features": extract_features.confs["superpoint_max"],
+        "matches": {
+            'output': 'matches-sp-lightglue',
+            'model': {
+                'name': 'lightglue',
+                'weights': 'superpoint_lightglue',
+                'flash': True,
+                'filter_threshold': 0.1,
+            },
+        },
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
+    "DISK+LG": {
+        "features": extract_features.confs["disk"],
+        "matches": {
+            'output': 'matches-disk-lightglue',
+            'model': {
+                'name': 'lightglue',
+                'weights': 'disk_lightglue',
+                'input_dim': 128,
+                'flash': True,
+                'filter_threshold': 0.1,
+            },
+        },
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
     "SP+SG+cos": {
         "features": extract_features.confs["superpoint_max"],
         "matches": match_features.confs["superglue"],
