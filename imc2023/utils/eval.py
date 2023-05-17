@@ -126,7 +126,9 @@ def eval_submission(
     for dataset in gt_dict:
         assert dataset in submission_dict, f"Unknown dataset: {dataset}"
         for scene in gt_dict[dataset]:
-            assert scene in submission_dict[dataset], f"Unknown scene: {dataset}->{scene}"
+            assert (
+                scene in submission_dict[dataset]
+            ), f"Unknown scene: {dataset}->{scene}"
             for image in gt_dict[dataset][scene]:
                 assert (
                     image in submission_dict[dataset][scene]
@@ -149,7 +151,9 @@ def eval_submission(
                 for j in range(i + 1, len(images)):
                     gt_i = gt_dict[dataset][scene][images[i]]
                     gt_j = gt_dict[dataset][scene][images[j]]
-                    dR_gt, dT_gt = compute_dR_dT(gt_i.rotmat, gt_i.tvec, gt_j.rotmat, gt_j.tvec)
+                    dR_gt, dT_gt = compute_dR_dT(
+                        gt_i.rotmat, gt_i.tvec, gt_j.rotmat, gt_j.tvec
+                    )
 
                     pred_i = submission_dict[dataset][scene][images[i]]
                     pred_j = submission_dict[dataset][scene][images[j]]
@@ -179,7 +183,9 @@ def eval_submission(
             print()
 
     if verbose:
-        print(f"Final metric -> mAA={np.mean(metrics_per_dataset):.06f} (t: {time() - t} sec.)")
+        print(
+            f"Final metric -> mAA={np.mean(metrics_per_dataset):.06f} (t: {time() - t} sec.)"
+        )
         print()
 
     return np.mean(metrics_per_dataset)
@@ -197,10 +203,37 @@ def eval(submission_csv: str, data_dir: str) -> float:
     """
     # Set rotation thresholds per scene.
     rotation_thresholds_degrees_dict = {
-        **{("haiper", scene): np.linspace(1, 10, 10) for scene in ["bike", "chairs", "fountain"]},
-        **{("heritage", scene): np.linspace(1, 10, 10) for scene in ["cyprus", "dioscuri"]},
+        **{
+            ("haiper", scene): np.linspace(1, 10, 10)
+            for scene in ["bike", "chairs", "fountain"]
+        },
+        **{
+            ("heritage", scene): np.linspace(1, 10, 10)
+            for scene in ["cyprus", "dioscuri"]
+        },
         **{("heritage", "wall"): np.linspace(0.2, 10, 10)},
         **{("urban", "kyiv-puppet-theater"): np.linspace(1, 10, 10)},
+        **{  # Using threshold values from IMC 2022 notebook https://www.kaggle.com/code/namgalielei/loftr-validation-score
+            ("phototourism", scene): np.linspace(1, 10, 10)
+            for scene in [
+                "brandenburg_gate",
+                "british_museum",
+                "buckingham_palace",
+                "colosseum_exterior",
+                "grand_place_brussels",
+                "lincoln_memorial_statue",
+                "notre_dame_front_facade",
+                "pantheon_exterior",
+                "piazza_san_marco",
+                "sacre_coeur",
+                "sagrada_familia",
+                "st_pauls_cathedral",
+                "st_peters_square",
+                "taj_mahal",
+                "temple_nara_japan",
+                "trevi_fountain",
+            ]
+        },
     }
 
     translation_thresholds_meters_dict = {
@@ -208,16 +241,44 @@ def eval(submission_csv: str, data_dir: str) -> float:
             ("haiper", scene): np.geomspace(0.05, 0.5, 10)
             for scene in ["bike", "chairs", "fountain"]
         },
-        **{("heritage", scene): np.geomspace(0.1, 2, 10) for scene in ["cyprus", "dioscuri"]},
+        **{
+            ("heritage", scene): np.geomspace(0.1, 2, 10)
+            for scene in ["cyprus", "dioscuri"]
+        },
         **{("heritage", "wall"): np.geomspace(0.05, 1, 10)},
         **{("urban", "kyiv-puppet-theater"): np.geomspace(0.5, 5, 10)},
+        **{  # Using threshold values from IMC 2022 notebook https://www.kaggle.com/code/namgalielei/loftr-validation-score
+            ("phototourism", scene): np.geomspace(0.2, 5, 10)
+            for scene in [
+                "brandenburg_gate",
+                "british_museum",
+                "buckingham_palace",
+                "colosseum_exterior",
+                "grand_place_brussels",
+                "lincoln_memorial_statue",
+                "notre_dame_front_facade",
+                "pantheon_exterior",
+                "piazza_san_marco",
+                "sacre_coeur",
+                "sagrada_familia",
+                "st_pauls_cathedral",
+                "st_peters_square",
+                "taj_mahal",
+                "temple_nara_japan",
+                "trevi_fountain",
+            ]
+        },
     }
 
     # Generate GT.
-    with open(f"{data_dir}/train/train_labels.csv", "r") as fr, open("ground_truth.csv", "w") as fw:
+    with open(f"{data_dir}/train/train_labels.csv", "r") as fr, open(
+        "ground_truth.csv", "w"
+    ) as fw:
         for i, l in enumerate(fr):
             if i == 0:
-                fw.write("image_path,dataset,scene,rotation_matrix,translation_vector\n")
+                fw.write(
+                    "image_path,dataset,scene,rotation_matrix,translation_vector\n"
+                )
             else:
                 dataset, scene, image, R, T = l.strip().split(",")
                 fw.write(f"{image},{dataset},{scene},{R},{T}\n")
