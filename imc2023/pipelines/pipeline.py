@@ -1,13 +1,11 @@
 """Abstract pipeline class."""
 import logging
 import cv2
-import numpy as np
 from abc import abstractmethod
 from typing import Any, Dict, List
 
 import pycolmap
 import dioad.infer
-from dioad.processing import rotate_preserve_size
 from hloc import extract_features, pairs_from_retrieval, reconstruction
 
 from imc2023.utils.utils import DataPaths
@@ -71,15 +69,25 @@ class Pipeline:
 
         deep_orientation = dioad.infer.Inference()
         for image_fn in self.img_list:
-            # predict and save rotation angle
+            # predict rotation angle
             path = str(self.paths.image_dir / image_fn)
             angle = deep_orientation.predict("vit", path)
+
+            # round angle to closest multiple of 90° and save it for later
+            if angle < 0.0:
+                angle += 360
+            angle = (round(angle / 90.0) * 90) % 360 # angle is now an integer in [0, 90, 180, 270]
             self.rotation_angles[image_fn] = angle
 
             # rotate and save image
             image = cv2.imread(path)
-            image = rotate_preserve_size(path, -angle, (400, 400), False) # TODO: use better image sizes
-            cv2.imwrite(str(self.paths.rotated_image_dir / image_fn), np.array(image))
+            if angle == 90:
+                image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+            elif angle == 180:
+                image = cv2.rotate(image, cv2.ROTATE_180)
+            elif angle == 270:
+                image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            cv2.imwrite(str(self.paths.rotated_image_dir / image_fn), image)
 
     def get_pairs(self) -> None:
         """Get pairs of images to match."""
@@ -90,16 +98,14 @@ class Pipeline:
         else:
             if self.use_rotation_matching:
                 image_dir = self.paths.rotated_image_dir
-                feature_path = self.paths.rotated_features_path
             else:
                 image_dir = self.paths.image_dir
-                feature_path = self.paths.features_retrieval
 
             extract_features.main(
                 conf=self.config["retrieval"],
                 image_dir=image_dir,
                 image_list=self.img_list,
-                feature_path=feature_path,
+                feature_path=self.paths.features_retrieval,
             )
 
         if self.paths.pairs_path.exists() and not self.overwrite:
@@ -129,7 +135,7 @@ class Pipeline:
         
         self.log_step("Unrotating keypoints")
         
-        # TODO 
+        # TODO: rotate and write keypoint from self.paths.rotated_features_path to self.paths.features_path
 
     def sfm(self) -> None:
         """Run Structure from Motion."""
