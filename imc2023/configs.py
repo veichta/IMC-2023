@@ -57,10 +57,13 @@ configs = {
             'output': 'matches-disk-lightglue',
             'model': {
                 'name': 'lightglue',
-                'weights': 'disk_lightglue',
+                'weights': 'disk_lightglue_legacy',
                 'input_dim': 128,
                 'flash': True,
                 'filter_threshold': 0.1,
+                'rotary': {
+                    'axial': True,
+                }
             },
         },
         "retrieval": extract_features.confs["netvlad"],

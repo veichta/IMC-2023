@@ -125,6 +125,30 @@ class LearnableFourierPositionalEncoding(nn.Module):
             return self.mlp(F)
 
 
+class AxialRotaryEmbedding(nn.Module):
+    def __init__(
+        self, dim, theta=0.01, learned_freq=False
+    ):
+        super().__init__()
+        freqs_x = 1. / (theta ** (torch.arange(0, dim, 2)[:(dim // 2)].float() / dim))
+        freqs_y = 1. / (theta ** (torch.arange(0, dim, 2)[:(dim // 2)].float() / dim))
+
+        self.freqs_x = nn.Parameter(freqs_x, requires_grad=learned_freq)
+        self.freqs_y = nn.Parameter(freqs_y, requires_grad=learned_freq)
+
+    def forward(self, pos):
+        freqs_x = torch.einsum('..., f -> ... f',
+                               pos[..., 0].type(self.freqs_x.dtype), self.freqs_x)
+        freqs_x = repeat(freqs_x, '... n -> ... (n r)', r=2)
+
+        freqs_y = torch.einsum('..., f -> ... f',
+                               pos[..., 1].type(self.freqs_y.dtype), self.freqs_y)
+        freqs_y = repeat(freqs_y, '... n -> ... (n r)', r=2)
+
+        freqs = torch.cat([freqs_x, freqs_y], dim=-1).unsqueeze(-2)
+        return torch.stack([freqs.cos(), freqs.sin()], 0)
+
+
 class TokenConfidence(nn.Module):
     def __init__(self, dim):
         super(TokenConfidence, self).__init__()
@@ -396,6 +420,7 @@ class LightGlue(nn.Module):
         'rotary': {
             'do': True,
             'hidden_dim': None,
+            'axial': False,
         },
         'n_layers': 9,
         'num_heads': 4,
@@ -434,10 +459,16 @@ class LightGlue(nn.Module):
             self.input_proj = nn.Identity()
 
         if conf.rotary.do:
-            head_dim = conf.descriptor_dim // conf.num_heads
-            self.posenc = LearnableFourierPositionalEncoding(
-                2, head_dim, head_dim, H_dim=conf.rotary.hidden_dim
-            )
+            if not conf.rotary.axial:
+                head_dim = conf.descriptor_dim // conf.num_heads
+                self.posenc = LearnableFourierPositionalEncoding(
+                    2, head_dim, head_dim, H_dim=conf.rotary.hidden_dim
+                )
+            else:
+                self.posenc = AxialRotaryEmbedding(
+                    conf.descriptor_dim // (conf.num_heads*2),
+                    learned_freq=True,
+                    theta=0.01)
         else:
             self.keypoint_encoder = nn.Sequential(
                 nn.Linear(4, 2*conf.descriptor_dim),
