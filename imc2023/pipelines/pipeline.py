@@ -20,6 +20,7 @@ class Pipeline:
         paths: DataPaths,
         img_list: List[str],
         use_pixsfm: bool = False,
+        use_rotation_matching : bool = False,
         overwrite: bool = False,
     ) -> None:
         """Initialize the pipeline.
@@ -29,11 +30,14 @@ class Pipeline:
             paths (DataPaths): Data paths.
             img_list (List[str]): List of image names.
             use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
+            use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
+            overwrite (bool, optional): Whether to overwrite previous output files. Defaults to False.
         """
         self.config = config
         self.paths = paths
         self.img_list = img_list
         self.use_pixsfm = use_pixsfm
+        self.use_rotation_matching = use_rotation_matching
         self.overwrite = overwrite
 
         self.sparse_model = None
@@ -51,6 +55,15 @@ class Pipeline:
     def preprocess(self) -> None:
         """Preprocess the images."""
         pass
+
+    def rotate_images(self) -> None:
+        """Rotate images for rotation matching."""
+        if not self.use_rotation_matching:
+            return
+        
+        self.log_step("Rotating images")
+        
+        # TODO 
 
     def get_pairs(self) -> None:
         """Get pairs of images to match."""
@@ -85,6 +98,15 @@ class Pipeline:
     def match_features(self) -> None:
         """Match features between images."""
         pass
+
+    def unrotate_keypoints(self) -> None:
+        """Unrotate keypoints after the rotation matching."""
+        if not self.use_rotation_matching:
+            return
+        
+        self.log_step("Unrotating keypoints")
+        
+        # TODO 
 
     def sfm(self) -> None:
         """Run Structure from Motion."""
@@ -125,7 +147,9 @@ class Pipeline:
     def run(self) -> None:
         """Run the pipeline."""
         self.preprocess()
+        self.rotate_images()
         self.get_pairs()
         self.extract_features()
         self.match_features()
+        self.unrotate_keypoints()
         self.sfm()

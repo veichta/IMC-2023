@@ -24,6 +24,7 @@ parser.add_argument(
 )
 parser.add_argument("--output", type=str, default="outputs", help="output dir")
 parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
+parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
 
@@ -43,6 +44,7 @@ logger.propagate = False
 MODE = args.mode  # "train" or "test"
 CONF_NAME = args.config
 PIXSFM = args.pixsfm
+ROTATION_MATCHING = args.rotation_matching
 OVERWRITE = args.overwrite
 
 # PATHS
@@ -135,6 +137,7 @@ for dataset in data_dict:
             paths=paths,
             img_list=img_list,
             use_pixsfm=PIXSFM,
+            use_rotation_matching=ROTATION_MATCHING,
             overwrite=OVERWRITE,
         )
 
