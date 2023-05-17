@@ -1,9 +1,13 @@
 """Abstract pipeline class."""
 import logging
+import cv2
+import numpy as np
 from abc import abstractmethod
 from typing import Any, Dict, List
 
 import pycolmap
+import dioad.infer
+from dioad.processing import rotate_preserve_size
 from hloc import extract_features, pairs_from_retrieval, reconstruction
 
 from imc2023.utils.utils import DataPaths
@@ -42,6 +46,8 @@ class Pipeline:
 
         self.sparse_model = None
 
+        self.rotation_angles = {}
+
     def log_step(self, title: str) -> None:
         """Log a title.
 
@@ -62,8 +68,18 @@ class Pipeline:
             return
         
         self.log_step("Rotating images")
-        
-        # TODO 
+
+        deep_orientation = dioad.infer.Inference()
+        for image_fn in self.img_list:
+            # predict and save rotation angle
+            path = str(self.paths.image_dir / image_fn)
+            angle = deep_orientation.predict("vit", path)
+            self.rotation_angles[image_fn] = angle
+
+            # rotate and save image
+            image = cv2.imread(path)
+            image = rotate_preserve_size(path, -angle, (400, 400), False) # TODO: use better image sizes
+            cv2.imwrite(str(self.paths.rotated_image_dir / image_fn), np.array(image))
 
     def get_pairs(self) -> None:
         """Get pairs of images to match."""
@@ -72,11 +88,18 @@ class Pipeline:
         if self.paths.pairs_path.exists() and not self.overwrite:
             logging.info(f"Pairs already at {self.paths.pairs_path}")
         else:
+            if self.use_rotation_matching:
+                image_dir = self.paths.rotated_image_dir
+                feature_path = self.paths.rotated_features_path
+            else:
+                image_dir = self.paths.image_dir
+                feature_path = self.paths.features_retrieval
+
             extract_features.main(
                 conf=self.config["retrieval"],
-                image_dir=self.paths.image_dir,
+                image_dir=image_dir,
                 image_list=self.img_list,
-                feature_path=self.paths.features_retrieval,
+                feature_path=feature_path,
             )
 
         if self.paths.pairs_path.exists() and not self.overwrite:

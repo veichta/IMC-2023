@@ -1,6 +1,7 @@
 import sys
 
 sys.path.append("ext_deps/Hierarchical-Localization")
+sys.path.append("ext_deps/dioad")
 
 import argparse
 import json

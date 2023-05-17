@@ -111,7 +111,6 @@ class DataPaths:
             raise ValueError(f"Invalid mode: {mode}")
 
         self.image_dir = Path(f"{data_dir}/{mode}/{dataset}/{scene}/images")
-        self.rotated_image_dir = Path(f"{data_dir}/{mode}/{dataset}/{scene}/images_rotated")
         self.scene_dir = output_dir / dataset / scene
         self.scene_dir.mkdir(parents=True, exist_ok=True)
 
@@ -119,8 +118,12 @@ class DataPaths:
         self.pairs_path = self.scene_dir / "pairs.txt"
         self.features_retrieval = self.scene_dir / "features_retrieval.h5"
         self.features_path = self.scene_dir / "features.h5"
-        self.rotated_features_path = self.scene_dir / "features_rotated.h5"
         self.matches_path = self.scene_dir / "matches.h5"
+
+        # for rotation matching
+        self.rotated_features_path = self.scene_dir / "features_rotated.h5"
+        self.rotated_image_dir = self.scene_dir / "images_rotated"
+        self.rotated_image_dir.mkdir(parents=True, exist_ok=True)
 
         # TODO: Update this.
         self.cache = self.scene_dir / "cache"
