@@ -22,6 +22,7 @@ parser.add_argument("--config", type=str, required=True, choices=configs.keys(),
 parser.add_argument(
     "--mode", type=str, required=True, choices=["train", "test"], help="train or test"
 )
+parser.add_argument("--output", type=str, default="outputs", help="output dir")
 parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
@@ -48,7 +49,7 @@ OVERWRITE = args.overwrite
 # Path("image-matching-challenge-2023")
 data_dir = Path(args.data)
 submission_dir = Path("submission.csv")
-output_dir = Path(f"outputs/{CONF_NAME}")
+output_dir = Path(f"{args.output}/{CONF_NAME}")
 output_dir.mkdir(exist_ok=True, parents=True)
 
 metrics_path = output_dir / "metrics.pickle"
@@ -67,6 +68,10 @@ logging.info("CONFIG:")
 for step, conf in config.items():
     if step == "n_retrieval":
         logging.info(f"  {step}: {conf}")
+        continue
+
+    if conf is None:
+        logging.info(f"  {step}: None")
         continue
 
     logging.info(f"{step}:")
