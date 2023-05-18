@@ -136,7 +136,7 @@ class Pipeline:
         if not self.use_rotation_matching:
             return
         
-        self.log_step("Unrotating keypoints")
+        self.log_step("Rotating keypoints")
 
         shutil.copy(self.paths.rotated_features_path, self.paths.features_path)
         
