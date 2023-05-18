@@ -10,8 +10,8 @@ import pickle
 from pathlib import Path
 
 import numpy as np
-import OmegaConf
 import pixsfm
+from omegaconf import OmegaConf
 
 from imc2023.configs import configs
 from imc2023.utils.eval import eval
