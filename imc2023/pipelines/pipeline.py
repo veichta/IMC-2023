@@ -1,6 +1,9 @@
 """Abstract pipeline class."""
 import logging
+import shutil
+import h5py
 import cv2
+import numpy as np
 from abc import abstractmethod
 from typing import Any, Dict, List
 
@@ -128,14 +131,42 @@ class Pipeline:
         """Match features between images."""
         pass
 
-    def unrotate_keypoints(self) -> None:
-        """Unrotate keypoints after the rotation matching."""
+    def rotate_keypoints(self) -> None:
+        """Rotate keypoints back after the rotation matching."""
         if not self.use_rotation_matching:
             return
         
         self.log_step("Unrotating keypoints")
+
+        shutil.copy(self.paths.rotated_features_path, self.paths.features_path)
         
-        # TODO: rotate and write keypoint from self.paths.rotated_features_path to self.paths.features_path
+        with h5py.File(str(self.paths.features_path), 'r+', libver='latest') as f:
+            for image_fn, angle in self.rotation_angles.items():
+                if angle == 0:
+                    continue
+
+                keypoints = f[image_fn]["keypoints"].__array__()
+                image_size = f[image_fn]["image_size"].__array__()
+
+                new_keypoints = np.zeros_like(keypoints)
+                if angle == 90:
+                    # rotate keypoints by -90 degrees
+                    # ==> (x,y) becomes (y, x_max - x)
+                    new_keypoints[:, 0] = keypoints[:, 1]
+                    new_keypoints[:, 1] = image_size[0] - keypoints[:, 0]
+                    f[image_fn]["image_size"][...] = np.array([image_size[1], image_size[0]])
+                elif angle == 180:
+                    # rotate keypoints by 180 degrees
+                    # ==> (x,y) becomes (x_max - x, y_max - y)
+                    new_keypoints[:, 0] = image_size[0] - keypoints[:, 0]
+                    new_keypoints[:, 1] = image_size[1] - keypoints[:, 1]
+                elif angle == 270:
+                    # rotate keypoints by +90 degrees
+                    # ==> (x,y) becomes (y_max - y, x)
+                    new_keypoints[:, 0] = image_size[1] - keypoints[:, 1]
+                    new_keypoints[:, 1] = keypoints[:, 0]
+                    f[image_fn]["image_size"][...] = np.array([image_size[1], image_size[0]])
+                f[image_fn]["keypoints"][...] = new_keypoints
 
     def sfm(self) -> None:
         """Run Structure from Motion."""
@@ -180,5 +211,5 @@ class Pipeline:
         self.get_pairs()
         self.extract_features()
         self.match_features()
-        self.unrotate_keypoints()
+        self.rotate_keypoints()
         self.sfm()
