@@ -5,10 +5,9 @@ from typing import Any, Dict, List
 
 import pycolmap
 from hloc import extract_features, pairs_from_retrieval, reconstruction
+from pixsfm.refine_hloc import PixSfM
 
 from imc2023.utils.utils import DataPaths
-
-# from pixsfm.refine_hloc import PixSfM
 
 
 class Pipeline:
@@ -98,17 +97,17 @@ class Pipeline:
                 self.sparse_model = None
 
         if self.use_pixsfm:
-            # refiner = PixSfM(conf=self.config["refinements"])
-            # self.sparse_model, _ = refiner.run(
-            #     output_dir=self.paths.sfm_dir,
-            #     image_dir=self.paths.image_dir,
-            #     pairs_path=self.paths.pairs_path,
-            #     features_path=self.paths.features_path,
-            #     matches_path=self.paths.matches_path,
-            #     cache_path=self.paths.cache,
-            #     verbose=False,
-            # )
-            return
+            refiner = PixSfM(conf=self.config["refinements"])
+            self.sparse_model, _ = refiner.run(
+                output_dir=self.paths.sfm_dir,
+                image_dir=self.paths.image_dir,
+                pairs_path=self.paths.pairs_path,
+                features_path=self.paths.features_path,
+                matches_path=self.paths.matches_path,
+                cache_path=self.paths.cache,
+                verbose=False,
+            )
+            # return
         else:
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,

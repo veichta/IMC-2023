@@ -10,6 +10,8 @@ import pickle
 from pathlib import Path
 
 import numpy as np
+import OmegaConf
+import pixsfm
 
 from imc2023.configs import configs
 from imc2023.utils.eval import eval
@@ -46,7 +48,6 @@ PIXSFM = args.pixsfm
 OVERWRITE = args.overwrite
 
 # PATHS
-# Path("image-matching-challenge-2023")
 data_dir = Path(args.data)
 submission_dir = Path("submission.csv")
 output_dir = Path(f"{args.output}/{CONF_NAME}")
@@ -61,8 +62,8 @@ config = configs[CONF_NAME]
 with open(str(output_dir / "config.json"), "w") as jf:
     json.dump(config, jf, indent=4)
 
-# if PIXSFM:
-#     config["refinements"] = OmegaConf.load(pixsfm.configs.parse_config_path("low_memory"))
+if PIXSFM:
+    config["refinements"] = OmegaConf.load(pixsfm.configs.parse_config_path("low_memory"))
 
 logging.info("CONFIG:")
 for step, conf in config.items():
