@@ -3,8 +3,6 @@ from dioad.models import load_vit_model
 from dioad.processing import preprocess, postprocess
 import argparse
 
-os.environ["CUDA_VISIBLE_DEVICES"]="-1"
-
 class Inference:
     def __init__(self, load_model_path="weights/model-vit-ang-loss.h5"):
         self.vit_model = load_vit_model(load_model_path=load_model_path)
@@ -13,7 +11,7 @@ class Inference:
     def predict(self, model_name, image_path, save_image_dir=None):
         X = preprocess(model_name, image_path)
         
-        y = self.vit_model.predict(X)[0][0]
+        y = self.vit_model.predict(X, verbose=0)[0][0]
 
         pred_angle = -y
         if save_image_dir:
