@@ -82,6 +82,36 @@ confs = {
         'max_error': 4,  # max error for assigned keypoints (in px)
         'cell_size': 4,  # size of quantization patch (max 1 kp/patch)
     },
+    'dkm_outdoor': 
+    {
+        'output': 'matches-dkm',
+        'model': {
+            'name': 'dkm',
+            'weights': 'outdoor'
+        },
+        'preprocessing': {
+            'grayscale': False,
+            'resize_max': 1024,
+            'dfactor': 8,
+        },
+        'max_error': 4,
+        'cell_size': 4,
+    },
+    'dkm_indoor': 
+    {
+        'output': 'matches-dkm',
+        'model': {
+            'name': 'dkm',
+            'weights': 'indoor'
+        },
+        'preprocessing': {
+            'grayscale': False,
+            'resize_max': 1024,
+            'dfactor': 8,
+        },
+        'max_error': 4,
+        'cell_size': 4,
+    }
 }
 
 

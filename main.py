@@ -68,10 +68,10 @@ for step, conf in config.items():
     if step == "n_retrieval":
         logging.info(f"  {step}: {conf}")
         continue
-
-    logging.info(f"{step}:")
-    for k, v in conf.items():
-        logging.info(f"  {k}: {v}")
+    if conf is not None:
+        logging.info(f"{step}:")
+        for k, v in conf.items():
+            logging.info(f"  {k}: {v}")
 
 
 # SETUP DATA DICT

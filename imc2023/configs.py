@@ -49,4 +49,33 @@ configs = {
         "retrieval": extract_features.confs["netvlad"],
         "n_retrieval": 50,
     },
+    "dkm-full": {
+        "features": None,
+        "matches": {
+            "output": "matches-dkm",
+            "model": {"name": "dkm", "weights": "outdoor"},
+            "preprocessing": {"grayscale": False, "resize_max": 1024, "dfactor": 8},  # 1024,
+            "max_error": 2,  # max error for assigned keypoints (in px)
+            "cell_size": 2,  # size of quantization patch (max 1 kp/patch)
+        },
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
+    "dkm-lim": {
+        "features": None,
+        "matches": {
+            "output": "matches-dkm",
+            "model": {
+                "name": "dkm",
+                "weights": "indoor",
+                "sample_num": 5000,
+                "max_num_matches": None,
+            },
+            "preprocessing": {"grayscale": False, "resize_max": 1024, "dfactor": 8},  # 1024,
+            "max_error": 4,  # max error for assigned keypoints (in px)
+            "cell_size": 2,  # size of quantization patch (max 1 kp/patch)
+        },
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 20,
+    },
 }

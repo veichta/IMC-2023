@@ -1,0 +1,33 @@
+{
+    "cSpell.words": [
+        "colmap",
+        "hloc",
+        "homog",
+        "Netvlad",
+        "pycolmap",
+        "SUPERPOINT"
+    ],
+    "autoDocstring.docstringFormat": "google",
+    "editor.formatOnSave": true,
+    "editor.formatOnType": false,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+    },
+    "editor.rulers": [
+        100
+    ],
+    "isort.args": [
+        "--line-length=100",
+        "--profile=black",
+        "--atomic"
+    ],
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=100",
+        "--docstring-convention=google"
+    ],
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length=100"
+    ]
+}

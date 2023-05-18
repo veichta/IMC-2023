@@ -1,0 +1,3 @@
+[submodule "ext_deps/DKM"]
+	path = ext_deps/DKM
+	url = git@github.com:Vathys/DKM.git
