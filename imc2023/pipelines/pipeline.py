@@ -3,6 +3,8 @@ import logging
 import shutil
 import h5py
 import cv2
+import gc
+from numba import cuda 
 import numpy as np
 from abc import abstractmethod
 from typing import Any, Dict, List
@@ -91,6 +93,12 @@ class Pipeline:
             elif angle == 270:
                 image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
             cv2.imwrite(str(self.paths.rotated_image_dir / image_fn), image)
+        
+        # free cuda memory
+        del deep_orientation
+        gc.collect()
+        device = cuda.get_current_device()
+        device.reset()
 
     def get_pairs(self) -> None:
         """Get pairs of images to match."""
