@@ -4,7 +4,7 @@ from abc import abstractmethod
 from typing import Any, Dict, List
 
 import pycolmap
-from hloc import extract_features, pairs_from_retrieval, reconstruction
+from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
 from pixsfm.refine_hloc import PixSfM
 
 from imc2023.utils.utils import DataPaths
@@ -55,6 +55,10 @@ class Pipeline:
         """Get pairs of images to match."""
         self.log_step("Get pairs")
 
+        if len(self.img_list) < self.config["n_retrieval"]:
+            pairs_from_exhaustive.main(output=self.paths.pairs_path, image_list=self.img_list)
+            return
+
         if self.paths.pairs_path.exists() and not self.overwrite:
             logging.info(f"Pairs already at {self.paths.pairs_path}")
         else:
@@ -71,7 +75,7 @@ class Pipeline:
 
         pairs_from_retrieval.main(
             descriptors=self.paths.features_retrieval,
-            num_matched=min(len(self.img_list), self.config["n_retrieval"]),
+            num_matched=self.config["n_retrieval"],
             output=self.paths.pairs_path,
         )
 
@@ -97,6 +101,9 @@ class Pipeline:
                 self.sparse_model = None
 
         if self.use_pixsfm:
+            if not self.paths.cache.exists():
+                self.paths.cache.mkdir(parents=True)
+
             refiner = PixSfM(conf=self.config["refinements"])
             self.sparse_model, _ = refiner.run(
                 output_dir=self.paths.sfm_dir,
