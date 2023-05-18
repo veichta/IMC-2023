@@ -49,13 +49,12 @@ OVERWRITE = args.overwrite
 
 # PATHS
 data_dir = Path(args.data)
-submission_dir = Path("submission.csv")
 output_dir = Path(f"{args.output}/{CONF_NAME}")
 output_dir.mkdir(exist_ok=True, parents=True)
 
 metrics_path = output_dir / "metrics.pickle"
 results_path = output_dir / "results.pickle"
-submission_csv_path = output_dir / "submission.csv"
+submission_csv_path = Path(f"{args.output}/submission.csv")
 
 # CONFIG
 config = configs[CONF_NAME]
@@ -159,9 +158,8 @@ for dataset in data_dict:
 
         logging.info("Done...")
 
-        create_submission(
-            out_results, data_dict, "submission.csv" if MODE == "train" else "../submission.csv"
-        )
+        create_submission(out_results, data_dict, submission_csv_path)
+        create_submission(out_results, data_dict, f"{args.output}/submission.csv")
 
         with open(metrics_path, "wb") as handle:
             pickle.dump(metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -169,9 +167,7 @@ for dataset in data_dict:
             pickle.dump(out_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 create_submission(out_results, data_dict, submission_csv_path)
-create_submission(
-    out_results, data_dict, "submission.csv" if MODE == "train" else "../submission.csv"
-)
+create_submission(out_results, data_dict, f"{args.output}/submission.csv")
 
 # WRITE SUBMISSION
 with open(metrics_path, "rb") as handle:
