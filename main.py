@@ -119,7 +119,7 @@ for dataset in data_dict:
         )
 
         if not paths.image_dir.exists():
-            logging.info("Skipping", dataset, scene)
+            logging.info(f"Skipping {dataset} - {scene} (no images)")
             continue
 
         img_list = [Path(p).name for p in data_dict[dataset][scene]]
@@ -163,6 +163,8 @@ for dataset in data_dict:
         with open(results_path, "wb") as handle:
             pickle.dump(out_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+create_submission(out_results, data_dict, submission_csv_path)
+create_submission(out_results, data_dict, "submission.csv")
 
 # WRITE SUBMISSION
 with open(metrics_path, "rb") as handle:
@@ -170,8 +172,6 @@ with open(metrics_path, "rb") as handle:
 with open(results_path, "rb") as handle:
     out_results = pickle.load(handle)
 
-create_submission(out_results, data_dict, submission_csv_path)
-create_submission(out_results, data_dict, "submission.csv")
 
 for dataset in metrics:
     logging.info(dataset)
