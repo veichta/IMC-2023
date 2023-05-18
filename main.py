@@ -159,13 +159,19 @@ for dataset in data_dict:
 
         logging.info("Done...")
 
+        create_submission(
+            out_results, data_dict, "submission.csv" if MODE == "train" else "../submission.csv"
+        )
+
         with open(metrics_path, "wb") as handle:
             pickle.dump(metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
         with open(results_path, "wb") as handle:
             pickle.dump(out_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 create_submission(out_results, data_dict, submission_csv_path)
-create_submission(out_results, data_dict, "submission.csv")
+create_submission(
+    out_results, data_dict, "submission.csv" if MODE == "train" else "../submission.csv"
+)
 
 # WRITE SUBMISSION
 with open(metrics_path, "rb") as handle:
