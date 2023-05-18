@@ -2,15 +2,11 @@
 import logging
 import shutil
 import h5py
-import cv2
-import gc
-from numba import cuda 
 import numpy as np
 from abc import abstractmethod
 from typing import Any, Dict, List
 
 import pycolmap
-import dioad.infer
 from hloc import extract_features, pairs_from_retrieval, reconstruction
 
 from imc2023.utils.utils import DataPaths
@@ -28,6 +24,7 @@ class Pipeline:
         img_list: List[str],
         use_pixsfm: bool = False,
         use_rotation_matching : bool = False,
+        rotation_angles: Dict[str, int] = None,
         overwrite: bool = False,
     ) -> None:
         """Initialize the pipeline.
@@ -38,6 +35,7 @@ class Pipeline:
             img_list (List[str]): List of image names.
             use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
             use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
+            rotation_angles (Dict[str, int]): Angles to undo rotation of keypoints. Defaults to None.
             overwrite (bool, optional): Whether to overwrite previous output files. Defaults to False.
         """
         self.config = config
@@ -49,7 +47,7 @@ class Pipeline:
 
         self.sparse_model = None
 
-        self.rotation_angles = {}
+        self.rotation_angles = rotation_angles
 
     def log_step(self, title: str) -> None:
         """Log a title.
@@ -64,41 +62,6 @@ class Pipeline:
     def preprocess(self) -> None:
         """Preprocess the images."""
         pass
-
-    def rotate_images(self) -> None:
-        """Rotate images for rotation matching."""
-        if not self.use_rotation_matching:
-            return
-        
-        self.log_step("Rotating images")
-
-        deep_orientation = dioad.infer.Inference()
-        for image_fn in self.img_list:
-            # predict rotation angle
-            path = str(self.paths.image_dir / image_fn)
-            angle = deep_orientation.predict("vit", path)
-
-            # round angle to closest multiple of 90° and save it for later
-            if angle < 0.0:
-                angle += 360
-            angle = (round(angle / 90.0) * 90) % 360 # angle is now an integer in [0, 90, 180, 270]
-            self.rotation_angles[image_fn] = angle
-
-            # rotate and save image
-            image = cv2.imread(path)
-            if angle == 90:
-                image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
-            elif angle == 180:
-                image = cv2.rotate(image, cv2.ROTATE_180)
-            elif angle == 270:
-                image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-            cv2.imwrite(str(self.paths.rotated_image_dir / image_fn), image)
-        
-        # free cuda memory
-        del deep_orientation
-        gc.collect()
-        device = cuda.get_current_device()
-        device.reset()
 
     def get_pairs(self) -> None:
         """Get pairs of images to match."""
@@ -215,7 +178,6 @@ class Pipeline:
     def run(self) -> None:
         """Run the pipeline."""
         self.preprocess()
-        self.rotate_images()
         self.get_pairs()
         self.extract_features()
         self.match_features()
