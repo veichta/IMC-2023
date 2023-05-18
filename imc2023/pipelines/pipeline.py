@@ -105,16 +105,19 @@ class Pipeline:
                 self.paths.cache.mkdir(parents=True)
 
             refiner = PixSfM(conf=self.config["refinements"])
-            self.sparse_model, _ = refiner.run(
-                output_dir=self.paths.sfm_dir,
-                image_dir=self.paths.image_dir,
-                pairs_path=self.paths.pairs_path,
-                features_path=self.paths.features_path,
-                matches_path=self.paths.matches_path,
-                cache_path=self.paths.cache,
-                verbose=False,
-            )
-            # return
+            try:
+                self.sparse_model, _ = refiner.run(
+                    output_dir=self.paths.sfm_dir,
+                    image_dir=self.paths.image_dir,
+                    pairs_path=self.paths.pairs_path,
+                    features_path=self.paths.features_path,
+                    matches_path=self.paths.matches_path,
+                    cache_path=self.paths.cache,
+                    verbose=False,
+                )
+            except ValueError:
+                logging.warning("Could not reconstruct model.")
+                self.sparse_model = None
         else:
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
@@ -125,8 +128,8 @@ class Pipeline:
                 matches=self.paths.matches_path,
                 verbose=False,
             )
-            if self.sparse_model is not None:
-                self.sparse_model.write(self.paths.sfm_dir)
+        if self.sparse_model is not None:
+            self.sparse_model.write(self.paths.sfm_dir)
 
     def run(self) -> None:
         """Run the pipeline."""
