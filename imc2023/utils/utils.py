@@ -120,5 +120,10 @@ class DataPaths:
         self.features_path = self.scene_dir / "features.h5"
         self.matches_path = self.scene_dir / "matches.h5"
 
+        # for rotation matching
+        self.rotated_features_path = self.scene_dir / "features_rotated.h5"
+        self.rotated_image_dir = self.scene_dir / "images_rotated"
+        self.rotated_image_dir.mkdir(parents=True, exist_ok=True)
+
         # TODO: Update this.
         self.cache = self.scene_dir / "cache"

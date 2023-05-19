@@ -17,11 +17,18 @@ class DensePipeline(Pipeline):
         if self.paths.matches_path.exists():
             logging.info(f"Matches already at {self.paths.matches_path}")
             return
+        
+        if self.use_rotation_matching:
+            feature_path = self.paths.rotated_features_path
+            image_dir = self.paths.rotated_image_dir
+        else:
+            feature_path = self.paths.features_path
+            image_dir = self.paths.image_dir
 
         match_dense.main(
             conf=self.config["matches"],
-            image_dir=self.paths.image_dir,
+            image_dir=image_dir,
             pairs=self.paths.pairs_path,
-            features=self.paths.features_path,
+            features=feature_path,
             matches=self.paths.matches_path,
         )

@@ -2,6 +2,7 @@
 image-matching-challenge-2023/**
 **.DS_Store
 **.csv
+.vscode/
 
 outputs/**
 outputs_old/**

@@ -1,5 +1,8 @@
 """Abstract pipeline class."""
 import logging
+import shutil
+import h5py
+import numpy as np
 from abc import abstractmethod
 from typing import Any, Dict, List
 
@@ -19,6 +22,8 @@ class Pipeline:
         paths: DataPaths,
         img_list: List[str],
         use_pixsfm: bool = False,
+        use_rotation_matching : bool = False,
+        rotation_angles: Dict[str, int] = None,
         overwrite: bool = False,
     ) -> None:
         """Initialize the pipeline.
@@ -28,14 +33,20 @@ class Pipeline:
             paths (DataPaths): Data paths.
             img_list (List[str]): List of image names.
             use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
+            use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
+            rotation_angles (Dict[str, int]): Angles to undo rotation of keypoints. Defaults to None.
+            overwrite (bool, optional): Whether to overwrite previous output files. Defaults to False.
         """
         self.config = config
         self.paths = paths
         self.img_list = img_list
         self.use_pixsfm = use_pixsfm
+        self.use_rotation_matching = use_rotation_matching
         self.overwrite = overwrite
 
         self.sparse_model = None
+
+        self.rotation_angles = rotation_angles
 
     def log_step(self, title: str) -> None:
         """Log a title.
@@ -62,9 +73,14 @@ class Pipeline:
         if self.paths.pairs_path.exists() and not self.overwrite:
             logging.info(f"Pairs already at {self.paths.pairs_path}")
         else:
+            if self.use_rotation_matching:
+                image_dir = self.paths.rotated_image_dir
+            else:
+                image_dir = self.paths.image_dir
+
             extract_features.main(
                 conf=self.config["retrieval"],
-                image_dir=self.paths.image_dir,
+                image_dir=image_dir,
                 image_list=self.img_list,
                 feature_path=self.paths.features_retrieval,
             )
@@ -88,6 +104,43 @@ class Pipeline:
     def match_features(self) -> None:
         """Match features between images."""
         pass
+
+    def rotate_keypoints(self) -> None:
+        """Rotate keypoints back after the rotation matching."""
+        if not self.use_rotation_matching:
+            return
+        
+        self.log_step("Rotating keypoints")
+
+        shutil.copy(self.paths.rotated_features_path, self.paths.features_path)
+        
+        with h5py.File(str(self.paths.features_path), 'r+', libver='latest') as f:
+            for image_fn, angle in self.rotation_angles.items():
+                if angle == 0:
+                    continue
+
+                keypoints = f[image_fn]["keypoints"].__array__()
+                image_size = f[image_fn]["image_size"].__array__()
+
+                new_keypoints = np.zeros_like(keypoints)
+                if angle == 90:
+                    # rotate keypoints by -90 degrees
+                    # ==> (x,y) becomes (y, x_max - x)
+                    new_keypoints[:, 0] = keypoints[:, 1]
+                    new_keypoints[:, 1] = image_size[0] - keypoints[:, 0]
+                    f[image_fn]["image_size"][...] = np.array([image_size[1], image_size[0]])
+                elif angle == 180:
+                    # rotate keypoints by 180 degrees
+                    # ==> (x,y) becomes (x_max - x, y_max - y)
+                    new_keypoints[:, 0] = image_size[0] - keypoints[:, 0]
+                    new_keypoints[:, 1] = image_size[1] - keypoints[:, 1]
+                elif angle == 270:
+                    # rotate keypoints by +90 degrees
+                    # ==> (x,y) becomes (y_max - y, x)
+                    new_keypoints[:, 0] = image_size[1] - keypoints[:, 1]
+                    new_keypoints[:, 1] = keypoints[:, 0]
+                    f[image_fn]["image_size"][...] = np.array([image_size[1], image_size[0]])
+                f[image_fn]["keypoints"][...] = new_keypoints
 
     def sfm(self) -> None:
         """Run Structure from Motion."""
@@ -137,4 +190,5 @@ class Pipeline:
         self.get_pairs()
         self.extract_features()
         self.match_features()
+        self.rotate_keypoints()
         self.sfm()
