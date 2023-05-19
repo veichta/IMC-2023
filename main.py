@@ -29,6 +29,7 @@ parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
 
+
 formatter = logging.Formatter(
     fmt="[%(asctime)s %(name)s %(levelname)s] %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
 )
@@ -169,7 +170,7 @@ for dataset in data_dict:
 create_submission(out_results, data_dict, submission_csv_path)
 create_submission(out_results, data_dict, f"{args.output}/submission.csv")
 
-# WRITE SUBMISSION
+# # WRITE SUBMISSION
 with open(metrics_path, "rb") as handle:
     metrics = pickle.load(handle)
 with open(results_path, "rb") as handle:
@@ -185,4 +186,4 @@ for dataset in metrics:
 
 # EVALUATE
 if MODE == "train":
-    eval(submission_csv="submission.csv", data_dir=data_dir)
+    eval(submission_csv=f"{args.output}/submission.csv", data_dir=data_dir)
