@@ -1,15 +1,21 @@
 import sys
 
 sys.path.append("ext_deps/Hierarchical-Localization")
+sys.path.append("ext_deps/dioad")
 
 import argparse
 import json
 import logging
 import os
+import gc
+import cv2
+from numba import cuda 
 import pickle
 from pathlib import Path
 
 import numpy as np
+
+import dioad.infer
 
 from imc2023.configs import configs
 from imc2023.utils.eval import eval
@@ -24,6 +30,7 @@ parser.add_argument(
 )
 parser.add_argument("--output", type=str, default="outputs", help="output dir")
 parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
+parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
 
@@ -43,6 +50,7 @@ logger.propagate = False
 MODE = args.mode  # "train" or "test"
 CONF_NAME = args.config
 PIXSFM = args.pixsfm
+ROTATION_MATCHING = args.rotation_matching
 OVERWRITE = args.overwrite
 
 # PATHS
@@ -87,6 +95,67 @@ for ds, ds_vals in data_dict.items():
     logging.info(ds)
     for scene in ds_vals.keys():
         logging.info(f"  {scene}: {len(data_dict[ds][scene])} imgs")
+
+# ROTATE IMAGES
+# the dioad model is huge and barely fits into the GPU
+# ==> much more efficient and less crash-prone to load 
+# the model only once and process all images in the beginning
+rotation_angles = {} # to undo rotations for the keypoints
+
+if ROTATION_MATCHING:
+    logging.info("Rotating images for rotation matching:")
+
+    deep_orientation = dioad.infer.Inference()
+    for dataset in data_dict:
+        # SKIP PHOTOTOURISM FOR TRAINING
+        if MODE == "train" and dataset == "phototourism":
+            continue
+
+        rotation_angles[dataset] = {}
+        for scene in data_dict[dataset]:
+            logging.info(f"  {dataset} - {scene}")
+
+            rotation_angles[dataset][scene] = {}
+
+            paths = DataPaths(
+                data_dir=data_dir,
+                output_dir=output_dir,
+                dataset=dataset,
+                scene=scene,
+                mode=MODE,
+            )
+
+            if not paths.image_dir.exists():
+                continue
+
+            img_list = [Path(p).name for p in data_dict[dataset][scene]]
+
+            for image_fn in img_list:
+                # predict rotation angle
+                path = str(paths.image_dir / image_fn)
+                angle = deep_orientation.predict("vit", path)
+
+                # round angle to closest multiple of 90° and save it for later
+                if angle < 0.0:
+                    angle += 360
+                angle = (round(angle / 90.0) * 90) % 360 # angle is now an integer in [0, 90, 180, 270]
+                rotation_angles[dataset][scene][image_fn] = angle
+
+                # rotate and save image
+                image = cv2.imread(path)
+                if angle == 90:
+                    image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+                elif angle == 180:
+                    image = cv2.rotate(image, cv2.ROTATE_180)
+                elif angle == 270:
+                    image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                cv2.imwrite(str(paths.rotated_image_dir / image_fn), image)
+            
+    # free cuda memory
+    del deep_orientation
+    gc.collect()
+    device = cuda.get_current_device()
+    device.reset()
 
 # RUN
 metrics = {}
@@ -135,6 +204,8 @@ for dataset in data_dict:
             paths=paths,
             img_list=img_list,
             use_pixsfm=PIXSFM,
+            use_rotation_matching=ROTATION_MATCHING,
+            rotation_angles=rotation_angles[dataset][scene] if ROTATION_MATCHING else None,
             overwrite=OVERWRITE,
         )
 
