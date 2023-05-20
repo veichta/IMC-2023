@@ -2,7 +2,15 @@ from hloc import extract_features, match_features
 
 configs = {
     "sift+NN": {
-        "features": extract_features.confs["sift"],
+        "features": {
+            "model": {"name": "dog"},
+            "options": {
+                "first_octave": -1,
+                "peak_threshold": 0.01,
+            },
+            "output": "feats-sift",
+            "preprocessing": {"grayscale": True, "resize_max": 1600},
+        },
         "matches": match_features.confs["NN-ratio"],
         "retrieval": extract_features.confs["netvlad"],
         "n_retrieval": 50,

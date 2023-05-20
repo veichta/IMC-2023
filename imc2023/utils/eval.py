@@ -116,6 +116,7 @@ def eval_submission(
     rotation_thresholds_degrees_dict,
     translation_thresholds_meters_dict,
     verbose=False,
+    return_dict=False,
 ):
     """Compute final metric given submission and ground truth files. Thresholds are specified per dataset."""
 
@@ -137,10 +138,13 @@ def eval_submission(
         t = time()
         print("*** METRICS ***")
 
+    all_metrics = {}
     metrics_per_dataset = []
     for dataset in gt_dict:
         metrics_per_scene = []
+        all_metrics[dataset] = {}
         for scene in gt_dict[dataset]:
+            all_metrics[dataset][scene] = {}
             err_q_all = []
             err_t_all = []
             images = list(gt_dict[dataset][scene])
@@ -172,8 +176,13 @@ def eval_submission(
                     f"{dataset} / {scene} ({len(images)} images, {len(err_q_all)} pairs) -> mAA={np.mean(mAA):.06f}, mAA_q={np.mean(mAA_q):.06f}, mAA_t={np.mean(mAA_t):.06f}"
                 )
             metrics_per_scene.append(np.mean(mAA))
+            all_metrics[dataset][scene]["mAA"] = float(np.mean(mAA))
+            all_metrics[dataset][scene]["mAA_q"] = float(np.mean(mAA_q))
+            all_metrics[dataset][scene]["mAA_t"] = float(np.mean(mAA_t))
 
         metrics_per_dataset.append(np.mean(metrics_per_scene))
+        all_metrics[dataset]["mAA"] = float(np.mean(metrics_per_scene))
+
         if verbose:
             print(f"{dataset} -> mAA={np.mean(metrics_per_scene):.06f}")
             print()
@@ -182,15 +191,23 @@ def eval_submission(
         print(f"Final metric -> mAA={np.mean(metrics_per_dataset):.06f} (t: {time() - t} sec.)")
         print()
 
+    all_metrics["mAA"] = float(np.mean(metrics_per_dataset))
+    if return_dict:
+        return all_metrics
+
     return np.mean(metrics_per_dataset)
 
 
-def eval(submission_csv: str, data_dir: str) -> float:
+def eval(
+    submission_csv: str, data_dir: str, verbose: bool = True, return_dict: bool = False
+) -> float:
     """Evaluate submission.
 
     Args:
         submission_csv (str): Path to submission csv file.
         data_dir (str): Path to data directory.
+        verbose (bool): Whether to print metrics. Defaults to True.
+        return_dict (bool): Whether to return a dictionary with all metrics. Defaults to False.
 
     Returns:
         float: Mean average accuracy.
@@ -227,7 +244,8 @@ def eval(submission_csv: str, data_dir: str) -> float:
         ground_truth_csv_path="ground_truth.csv",
         rotation_thresholds_degrees_dict=rotation_thresholds_degrees_dict,
         translation_thresholds_meters_dict=translation_thresholds_meters_dict,
-        verbose=True,
+        verbose=verbose,
+        return_dict=return_dict,
     )
 
 

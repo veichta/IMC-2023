@@ -6,6 +6,7 @@ image-matching-challenge-2023/**
 
 outputs/**
 outputs_old/**
+weights/**
 
 **.jpg
 **.png

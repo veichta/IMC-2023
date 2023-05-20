@@ -3,21 +3,24 @@ import sys
 sys.path.append("ext_deps/Hierarchical-Localization")
 sys.path.append("ext_deps/dioad")
 
+# sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/Hierarchical-Localization")
+# sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/dioad")
+
 import argparse
+import gc
 import json
 import logging
 import os
-import gc
-import cv2
-from numba import cuda 
 import pickle
 from pathlib import Path
 
+import cv2
+import dioad.infer
 import numpy as np
 import pixsfm
+from numba import cuda
 from omegaconf import OmegaConf
-
-import dioad.infer
+from tqdm import tqdm
 
 from imc2023.configs import configs
 from imc2023.utils.eval import eval
@@ -35,6 +38,20 @@ parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
 parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
+
+# os.makedirs("/kaggle/temp", exist_ok=True)
+
+# args = {
+#     "data": "/kaggle/input/image-matching-challenge-2023",
+#     "config": "DISK+LG",
+#     "mode": "train",
+#     "output": "/kaggle/temp",
+#     "pixsfm": False,
+#     "rotation_matching": False,
+#     "overwrite": False,
+# }
+
+# args = argparse.Namespace(**args)
 
 
 formatter = logging.Formatter(
@@ -58,12 +75,19 @@ OVERWRITE = args.overwrite
 
 # PATHS
 data_dir = Path(args.data)
-output_dir = Path(f"{args.output}/{CONF_NAME}")
+
+output_dir = f"{args.output}/{CONF_NAME}"
+if ROTATION_MATCHING:
+    output_dir += "-rot"
+if PIXSFM:
+    output_dir += "-pixsfm"
+output_dir = Path(output_dir)
+
 output_dir.mkdir(exist_ok=True, parents=True)
 
 metrics_path = output_dir / "metrics.pickle"
 results_path = output_dir / "results.pickle"
-submission_csv_path = Path(f"{args.output}/submission.csv")
+submission_csv_path = Path(f"{output_dir}/submission.csv")
 
 # CONFIG
 config = configs[CONF_NAME]
@@ -99,9 +123,9 @@ for ds, ds_vals in data_dict.items():
 
 # ROTATE IMAGES
 # the dioad model is huge and barely fits into the GPU
-# ==> much more efficient and less crash-prone to load 
+# ==> much more efficient and less crash-prone to load
 # the model only once and process all images in the beginning
-rotation_angles = {} # to undo rotations for the keypoints
+rotation_angles = {}  # to undo rotations for the keypoints
 
 if ROTATION_MATCHING:
     logging.info("Rotating images for rotation matching:")
@@ -130,8 +154,8 @@ if ROTATION_MATCHING:
                 continue
 
             img_list = [Path(p).name for p in data_dict[dataset][scene]]
-
-            for image_fn in img_list:
+            n_rotated = 0
+            for image_fn in tqdm(img_list, desc=f"Rotating {dataset}/{scene}", ncols=80):
                 # predict rotation angle
                 path = str(paths.image_dir / image_fn)
                 angle = deep_orientation.predict("vit", path)
@@ -139,8 +163,13 @@ if ROTATION_MATCHING:
                 # round angle to closest multiple of 90° and save it for later
                 if angle < 0.0:
                     angle += 360
-                angle = (round(angle / 90.0) * 90) % 360 # angle is now an integer in [0, 90, 180, 270]
+                angle = (
+                    round(angle / 90.0) * 90
+                ) % 360  # angle is now an integer in [0, 90, 180, 270]
                 rotation_angles[dataset][scene][image_fn] = angle
+
+                if angle != 0:
+                    n_rotated += 1
 
                 # rotate and save image
                 image = cv2.imread(path)
@@ -151,7 +180,9 @@ if ROTATION_MATCHING:
                 elif angle == 270:
                     image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
                 cv2.imwrite(str(paths.rotated_image_dir / image_fn), image)
-            
+
+            logging.info(f"  {n_rotated} / {len(img_list)} images rotated")
+
     # free cuda memory
     del deep_orientation
     gc.collect()
@@ -230,31 +261,29 @@ for dataset in data_dict:
 
         logging.info("Done...")
 
-        create_submission(out_results, data_dict, submission_csv_path)
-        create_submission(out_results, data_dict, f"{args.output}/submission.csv")
-
         with open(metrics_path, "wb") as handle:
             pickle.dump(metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
         with open(results_path, "wb") as handle:
             pickle.dump(out_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+
 create_submission(out_results, data_dict, submission_csv_path)
-create_submission(out_results, data_dict, f"{args.output}/submission.csv")
-
-# # WRITE SUBMISSION
-with open(metrics_path, "rb") as handle:
-    metrics = pickle.load(handle)
-with open(results_path, "rb") as handle:
-    out_results = pickle.load(handle)
+create_submission(out_results, data_dict, "submission.csv")
 
 
-for dataset in metrics:
-    logging.info(dataset)
-    for scene in metrics[dataset]:
-        logging.info(
-            f"\t{scene}: {metrics[dataset][scene]['n_reg_images']} / {metrics[dataset][scene]['n_images']}"
-        )
-
-# EVALUATE
 if MODE == "train":
-    eval(submission_csv=f"{args.output}/submission.csv", data_dir=data_dir)
+    # # WRITE SUBMISSION
+    with open(metrics_path, "rb") as handle:
+        metrics = pickle.load(handle)
+    with open(results_path, "rb") as handle:
+        out_results = pickle.load(handle)
+
+    for dataset in metrics:
+        logging.info(dataset)
+        for scene in metrics[dataset]:
+            logging.info(
+                f"\t{scene}: {metrics[dataset][scene]['n_reg_images']} / {metrics[dataset][scene]['n_images']}"
+            )
+
+    # EVALUATE
+    eval(submission_csv="submission.csv", data_dir=data_dir)
