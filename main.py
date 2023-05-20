@@ -11,6 +11,7 @@ import gc
 import json
 import logging
 import os
+import shutil
 import pickle
 from pathlib import Path
 
@@ -156,30 +157,35 @@ if ROTATION_MATCHING:
             img_list = [Path(p).name for p in data_dict[dataset][scene]]
             n_rotated = 0
             for image_fn in tqdm(img_list, desc=f"Rotating {dataset}/{scene}", ncols=80):
-                # predict rotation angle
-                path = str(paths.image_dir / image_fn)
-                angle = deep_orientation.predict("vit", path)
+                try:
+                    # predict rotation angle
+                    path = str(paths.image_dir / image_fn)
+                    angle = deep_orientation.predict("vit", path)
 
-                # round angle to closest multiple of 90° and save it for later
-                if angle < 0.0:
-                    angle += 360
-                angle = (
-                    round(angle / 90.0) * 90
-                ) % 360  # angle is now an integer in [0, 90, 180, 270]
-                rotation_angles[dataset][scene][image_fn] = angle
+                    # round angle to closest multiple of 90° and save it for later
+                    if angle < 0.0:
+                        angle += 360
+                    angle = (
+                        round(angle / 90.0) * 90
+                    ) % 360  # angle is now an integer in [0, 90, 180, 270]
+                    rotation_angles[dataset][scene][image_fn] = angle
 
-                if angle != 0:
-                    n_rotated += 1
+                    if angle != 0:
+                        n_rotated += 1
 
-                # rotate and save image
-                image = cv2.imread(path)
-                if angle == 90:
-                    image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
-                elif angle == 180:
-                    image = cv2.rotate(image, cv2.ROTATE_180)
-                elif angle == 270:
-                    image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-                cv2.imwrite(str(paths.rotated_image_dir / image_fn), image)
+                    # rotate and save image
+                    image = cv2.imread(path)
+                    if angle == 90:
+                        image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+                    elif angle == 180:
+                        image = cv2.rotate(image, cv2.ROTATE_180)
+                    elif angle == 270:
+                        image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                    cv2.imwrite(str(paths.rotated_image_dir / image_fn), image)
+                except:
+                    # just copy the image as it is
+                    shutil.copy(paths.image_dir / image_fn, paths.rotated_image_dir / image_fn)
+                    rotation_angles[dataset][scene][image_fn] = 0
 
             logging.info(f"  {n_rotated} / {len(img_list)} images rotated")
 
