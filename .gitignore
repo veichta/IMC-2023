@@ -6,11 +6,15 @@ image-matching-challenge-2023/**
 
 outputs/**
 outputs_old/**
+weights/**
 
 **.jpg
 **.png
 **.svg
 **.gif
+
+ext_deps/Hierarchical-Localization/third_party/LightGlue/weights/disk_lightglue_legacy.pth
+ext_deps/Hierarchical-Localization/third_party/LightGlue/weights/superpoint_lightglue.pth
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

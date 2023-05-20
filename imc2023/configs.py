@@ -2,7 +2,15 @@ from hloc import extract_features, match_features
 
 configs = {
     "sift+NN": {
-        "features": extract_features.confs["sift"],
+        "features": {
+            "model": {"name": "dog"},
+            "options": {
+                "first_octave": -1,
+                "peak_threshold": 0.01,
+            },
+            "output": "feats-sift",
+            "preprocessing": {"grayscale": True, "resize_max": 1600},
+        },
         "matches": match_features.confs["NN-ratio"],
         "retrieval": extract_features.confs["netvlad"],
         "n_retrieval": 50,
@@ -40,12 +48,12 @@ configs = {
     "SP+LG": {
         "features": extract_features.confs["superpoint_max"],
         "matches": {
-            'output': 'matches-sp-lightglue',
-            'model': {
-                'name': 'lightglue',
-                'weights': 'superpoint_lightglue',
-                'flash': True,
-                'filter_threshold': 0.1,
+            "output": "matches-sp-lightglue",
+            "model": {
+                "name": "lightglue",
+                "weights": "superpoint_lightglue",
+                "flash": False,
+                "filter_threshold": 0.1,
             },
         },
         "retrieval": extract_features.confs["netvlad"],
@@ -54,16 +62,16 @@ configs = {
     "DISK+LG": {
         "features": extract_features.confs["disk"],
         "matches": {
-            'output': 'matches-disk-lightglue',
-            'model': {
-                'name': 'lightglue',
-                'weights': 'disk_lightglue_legacy',
-                'input_dim': 128,
-                'flash': True,
-                'filter_threshold': 0.1,
-                'rotary': {
-                    'axial': True,
-                }
+            "output": "matches-disk-lightglue",
+            "model": {
+                "name": "lightglue",
+                "weights": "disk_lightglue_legacy",
+                "input_dim": 128,
+                "flash": False,
+                "filter_threshold": 0.1,
+                "rotary": {
+                    "axial": True,
+                },
             },
         },
         "retrieval": extract_features.confs["netvlad"],
