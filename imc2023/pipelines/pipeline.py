@@ -2,6 +2,7 @@
 import logging
 import shutil
 import h5py
+import cv2
 import numpy as np
 from abc import abstractmethod
 from typing import Any, Dict, List
@@ -120,26 +121,24 @@ class Pipeline:
                     continue
 
                 keypoints = f[image_fn]["keypoints"].__array__()
-                image_size = f[image_fn]["image_size"].__array__()
+                y_max, x_max = cv2.imread(str(self.paths.rotated_image_dir / image_fn)).shape[:2]
 
                 new_keypoints = np.zeros_like(keypoints)
                 if angle == 90:
                     # rotate keypoints by -90 degrees
                     # ==> (x,y) becomes (y, x_max - x)
                     new_keypoints[:, 0] = keypoints[:, 1]
-                    new_keypoints[:, 1] = image_size[0] - keypoints[:, 0]
-                    f[image_fn]["image_size"][...] = np.array([image_size[1], image_size[0]])
+                    new_keypoints[:, 1] = x_max - keypoints[:, 0]
                 elif angle == 180:
                     # rotate keypoints by 180 degrees
                     # ==> (x,y) becomes (x_max - x, y_max - y)
-                    new_keypoints[:, 0] = image_size[0] - keypoints[:, 0]
-                    new_keypoints[:, 1] = image_size[1] - keypoints[:, 1]
+                    new_keypoints[:, 0] = x_max - keypoints[:, 0]
+                    new_keypoints[:, 1] = y_max - keypoints[:, 1]
                 elif angle == 270:
                     # rotate keypoints by +90 degrees
                     # ==> (x,y) becomes (y_max - y, x)
-                    new_keypoints[:, 0] = image_size[1] - keypoints[:, 1]
+                    new_keypoints[:, 0] = y_max - keypoints[:, 1]
                     new_keypoints[:, 1] = keypoints[:, 0]
-                    f[image_fn]["image_size"][...] = np.array([image_size[1], image_size[0]])
                 f[image_fn]["keypoints"][...] = new_keypoints
 
     def sfm(self) -> None:
