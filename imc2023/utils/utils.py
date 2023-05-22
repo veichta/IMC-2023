@@ -125,5 +125,4 @@ class DataPaths:
         self.rotated_image_dir = self.scene_dir / "images_rotated"
         self.rotated_image_dir.mkdir(parents=True, exist_ok=True)
 
-        # TODO: Update this.
-        self.cache = self.scene_dir / "cache"
+        self.cache = output_dir / "cache"
