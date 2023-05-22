@@ -36,6 +36,7 @@ parser.add_argument(
 )
 parser.add_argument("--output", type=str, default="outputs", help="output dir")
 parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
+parser.add_argument("--pixsfm_max_imgs", type=int, default=9999, help="max number of images for PixSfM")
 parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
@@ -48,6 +49,7 @@ args = parser.parse_args()
 #     "mode": "train",
 #     "output": "/kaggle/temp",
 #     "pixsfm": False,
+#     "pixsfm_max_imgs": 9999,
 #     "rotation_matching": False,
 #     "overwrite": False,
 # }
@@ -71,6 +73,7 @@ logger.propagate = False
 MODE = args.mode  # "train" or "test"
 CONF_NAME = args.config
 PIXSFM = args.pixsfm
+PIXSFM_MAX_IMGS = args.pixsfm_max_imgs
 ROTATION_MATCHING = args.rotation_matching
 OVERWRITE = args.overwrite
 
@@ -242,6 +245,7 @@ for dataset in data_dict:
             paths=paths,
             img_list=img_list,
             use_pixsfm=PIXSFM,
+            pixsfm_max_imgs=PIXSFM_MAX_IMGS,
             use_rotation_matching=ROTATION_MATCHING,
             rotation_angles=rotation_angles[dataset][scene] if ROTATION_MATCHING else None,
             overwrite=OVERWRITE,

@@ -23,6 +23,7 @@ class Pipeline:
         paths: DataPaths,
         img_list: List[str],
         use_pixsfm: bool = False,
+        pixsfm_max_imgs: int = 9999,
         use_rotation_matching : bool = False,
         rotation_angles: Dict[str, int] = None,
         overwrite: bool = False,
@@ -34,6 +35,7 @@ class Pipeline:
             paths (DataPaths): Data paths.
             img_list (List[str]): List of image names.
             use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
+            pixsfm_max_imgs (int, optional): Max number of images for PixSFM. Defaults to 9999.
             use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
             rotation_angles (Dict[str, int]): Angles to undo rotation of keypoints. Defaults to None.
             overwrite (bool, optional): Whether to overwrite previous output files. Defaults to False.
@@ -42,6 +44,7 @@ class Pipeline:
         self.paths = paths
         self.img_list = img_list
         self.use_pixsfm = use_pixsfm
+        self.pixsfm_max_imgs = pixsfm_max_imgs
         self.use_rotation_matching = use_rotation_matching
         self.overwrite = overwrite
 
@@ -152,7 +155,9 @@ class Pipeline:
             except ValueError:
                 self.sparse_model = None
 
-        if self.use_pixsfm:
+        if self.use_pixsfm and len(self.img_list) <= self.pixsfm_max_imgs:
+            logging.info("Using PixSfM")
+
             if not self.paths.cache.exists():
                 self.paths.cache.mkdir(parents=True)
 
