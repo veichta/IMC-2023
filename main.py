@@ -21,6 +21,7 @@ import numpy as np
 import pixsfm
 from numba import cuda
 from omegaconf import OmegaConf
+from PIL import Image
 from tqdm import tqdm
 
 from imc2023.configs import configs
@@ -137,7 +138,9 @@ if ROTATION_MATCHING:
 
     logging.info("Rotating images for rotation matching:")
 
-    deep_orientation = dioad.infer.Inference()
+    deep_orientation = dioad.infer.Inference(
+        load_model_path="ext_deps/dioad/weights/model-vit-ang-loss.h5"
+    )
     for dataset in data_dict:
         # SKIP PHOTOTOURISM FOR TRAINING
         if MODE == "train" and dataset == "phototourism":
@@ -166,6 +169,7 @@ if ROTATION_MATCHING:
                 # predict rotation angle
                 path = str(paths.image_dir / image_fn)
 
+                _ = Image.open(path)
                 try:
                     angle = deep_orientation.predict("vit", path)
                 except:
