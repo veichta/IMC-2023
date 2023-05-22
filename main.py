@@ -109,6 +109,14 @@ for step, conf in config.items():
         logging.info(f"  {step}: None")
         continue
 
+    if type(conf) == list:
+        logging.info(f"  {step}:")
+        for i, c in enumerate(conf):
+            logging.info(f"    {i}:")
+            for k, v in c.items():
+                logging.info(f"      {k}: {v}")
+        continue
+
     logging.info(f"{step}:")
     for k, v in conf.items():
         logging.info(f"  {k}: {v}")
@@ -169,7 +177,6 @@ if ROTATION_MATCHING:
                 # predict rotation angle
                 path = str(paths.image_dir / image_fn)
 
-                _ = Image.open(path)
                 try:
                     angle = deep_orientation.predict("vit", path)
                 except:
