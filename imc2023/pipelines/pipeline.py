@@ -1,6 +1,8 @@
 """Abstract pipeline class."""
+import argparse
 import logging
 import shutil
+import time
 from abc import abstractmethod
 from typing import Any, Dict, List
 
@@ -11,8 +13,20 @@ import pycolmap
 from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
 from pixsfm.refine_hloc import PixSfM
 
+from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
+
+
+def time_function(func):
+    """Time a function."""
+
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        func(*args, **kwargs)
+        return time.time() - start
+
+    return wrapper
 
 
 class Pipeline:
@@ -23,10 +37,7 @@ class Pipeline:
         config: Dict[str, Any],
         paths: DataPaths,
         img_list: List[str],
-        use_pixsfm: bool = False,
-        use_rotation_matching: bool = False,
-        rotation_angles: Dict[str, int] = None,
-        overwrite: bool = False,
+        args: argparse.Namespace,
     ) -> None:
         """Initialize the pipeline.
 
@@ -36,15 +47,17 @@ class Pipeline:
             img_list (List[str]): List of image names.
             use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
             use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
-            rotation_angles (Dict[str, int]): Angles to undo rotation of keypoints. Defaults to None.
             overwrite (bool, optional): Whether to overwrite previous output files. Defaults to False.
         """
         self.config = config
         self.paths = paths
         self.img_list = img_list
-        self.use_pixsfm = use_pixsfm
-        self.use_rotation_matching = use_rotation_matching
-        self.overwrite = overwrite
+        self.use_pixsfm = args.pixsfm
+        self.use_rotation_matching = args.rotation_matching
+        self.overwrite = args.overwrite
+        self.args = args
+
+        self.sparse_model = None
 
         self.is_ensemble = type(self.config["features"]) == list
         if self.is_ensemble:
@@ -55,9 +68,18 @@ class Pipeline:
                 len(self.config["features"]) == 2
             ), "Only two features are supported for ensemble matching."
 
-        self.sparse_model = None
+        self.rotation_angles = {}
 
-        self.rotation_angles = rotation_angles
+        self.timing = {
+            "preprocess": 0,
+            "get_pairs": 0,
+            "extract_features": 0,
+            "match_features": 0,
+            "create_ensemble": 0,
+            "rotate_keypoints": 0,
+            "sfm": 0,
+            "localize_unregistered": 0,
+        }
 
     def log_step(self, title: str) -> None:
         """Log a title.
@@ -71,7 +93,13 @@ class Pipeline:
 
     def preprocess(self) -> None:
         """Preprocess the images."""
-        pass
+        self.log_step("Preprocessing")
+        self.rotation_angles = preprocess_image_dir(
+            input_dir=self.paths.input_dir,
+            output_dir=self.paths.scene_dir,
+            image_list=self.img_list,
+            args=self.args,
+        )
 
     def get_pairs(self) -> None:
         """Get pairs of images to match."""
@@ -83,6 +111,7 @@ class Pipeline:
 
         if self.paths.pairs_path.exists() and not self.overwrite:
             logging.info(f"Pairs already at {self.paths.pairs_path}")
+            return
         else:
             if self.use_rotation_matching:
                 image_dir = self.paths.rotated_image_dir
@@ -95,10 +124,6 @@ class Pipeline:
                 image_list=self.img_list,
                 feature_path=self.paths.features_retrieval,
             )
-
-        if self.paths.pairs_path.exists() and not self.overwrite:
-            logging.info(f"Pairs already at {self.paths.pairs_path}")
-            return
 
         pairs_from_retrieval.main(
             descriptors=self.paths.features_retrieval,
@@ -115,6 +140,36 @@ class Pipeline:
     def match_features(self) -> None:
         """Match features between images."""
         pass
+
+    def create_ensemble(self) -> None:
+        """Concatenate features and matches."""
+        if not self.is_ensemble:
+            return
+
+        self.log_step("Creating ensemble")
+
+        feature_path = self.paths.features_path
+        if self.use_rotation_matching:
+            feature_path = self.paths.rotated_features_path
+
+        fpath1 = self.paths.features_path.parent / f'{self.config["features"][0]["output"]}.h5'
+        fpath2 = self.paths.features_path.parent / f'{self.config["features"][1]["output"]}.h5'
+
+        concat_features(
+            features1=fpath1,
+            features2=fpath2,
+            out_path=feature_path,
+        )
+
+        mpath1 = self.paths.matches_path.parent / f'{self.config["matches"][0]["output"]}.h5'
+        mpath2 = self.paths.matches_path.parent / f'{self.config["matches"][1]["output"]}.h5'
+
+        concat_matches(
+            matches1_path=mpath1,
+            matches2_path=mpath2,
+            ensemble_features_path=feature_path,
+            out_path=self.paths.matches_path,
+        )
 
     def create_ensemble(self) -> None:
         """Concatenate features and matches."""
@@ -153,8 +208,10 @@ class Pipeline:
 
         self.log_step("Rotating keypoints")
 
+        logging.info(f"Using rotated features from {self.paths.rotated_features_path}")
         shutil.copy(self.paths.rotated_features_path, self.paths.features_path)
 
+        logging.info(f"Writing rotated keypoints to {self.paths.features_path}")
         with h5py.File(str(self.paths.features_path), "r+", libver="latest") as f:
             for image_fn, angle in self.rotation_angles.items():
                 if angle == 0:
@@ -188,9 +245,15 @@ class Pipeline:
         if self.paths.sfm_dir.exists() and not self.overwrite:
             try:
                 self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
+                logging.info(f"Sparse model already at {self.paths.sfm_dir}")
                 return
             except ValueError:
                 self.sparse_model = None
+
+        logging.info(f"Using images from {self.paths.image_dir}")
+        logging.info(f"Using pairs from {self.paths.pairs_path}")
+        logging.info(f"Using features from {self.paths.features_path}")
+        logging.info(f"Using matches from {self.paths.matches_path}")
 
         if self.use_pixsfm:
             if not self.paths.cache.exists():
@@ -220,15 +283,23 @@ class Pipeline:
                 matches=self.paths.matches_path,
                 verbose=False,
             )
+
         if self.sparse_model is not None:
             self.sparse_model.write(self.paths.sfm_dir)
 
+    def localize_unregistered(self) -> None:
+        """Try to localize unregistered images."""
+        pass
+
     def run(self) -> None:
         """Run the pipeline."""
-        self.preprocess()
-        self.get_pairs()
-        self.extract_features()
-        self.match_features()
-        self.create_ensemble()
-        self.rotate_keypoints()
-        self.sfm()
+        self.timing = {
+            "preprocessing": time_function(self.preprocess)(),
+            "pairs-extraction": time_function(self.get_pairs)(),
+            "feature-extraction": time_function(self.extract_features)(),
+            "feature-matching": time_function(self.match_features)(),
+            "create-ensemble": time_function(self.create_ensemble)(),
+            "rotate-keypoints": time_function(self.rotate_keypoints)(),
+            "sfm": time_function(self.sfm)(),
+            "localize-unreg": time_function(self.localize_unregistered)(),
+        }

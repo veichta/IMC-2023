@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Tuple
 import cv2
 import dioad.infer
 import numpy as np
-from numba import cuda
+
+# from numba import cuda
 from tqdm import tqdm
 
 
@@ -113,8 +114,8 @@ def preprocess_image_dir(
         # free cuda memory
         del deep_orientation
         gc.collect()
-        device = cuda.get_current_device()
-        device.reset()
+        # device = cuda.get_current_device()
+        # device.reset()
 
     logging.info(f"Rotated {n_rotated} of {n_total} images.")
 
