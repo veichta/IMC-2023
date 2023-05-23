@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import pickle
+import shutil
 from pathlib import Path
 
 import cv2
@@ -20,6 +21,7 @@ import numpy as np
 import pixsfm
 from numba import cuda
 from omegaconf import OmegaConf
+from PIL import Image
 from tqdm import tqdm
 
 from imc2023.configs import configs
@@ -107,6 +109,14 @@ for step, conf in config.items():
         logging.info(f"  {step}: None")
         continue
 
+    if type(conf) == list:
+        logging.info(f"  {step}:")
+        for i, c in enumerate(conf):
+            logging.info(f"    {i}:")
+            for k, v in c.items():
+                logging.info(f"      {k}: {v}")
+        continue
+
     logging.info(f"{step}:")
     for k, v in conf.items():
         logging.info(f"  {k}: {v}")
@@ -128,9 +138,17 @@ for ds, ds_vals in data_dict.items():
 rotation_angles = {}  # to undo rotations for the keypoints
 
 if ROTATION_MATCHING:
+    import tensorflow as tf
+
+    gpus = tf.config.experimental.list_physical_devices("GPU")
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
     logging.info("Rotating images for rotation matching:")
 
-    deep_orientation = dioad.infer.Inference()
+    deep_orientation = dioad.infer.Inference(
+        load_model_path="ext_deps/dioad/weights/model-vit-ang-loss.h5"
+    )
     for dataset in data_dict:
         # SKIP PHOTOTOURISM FOR TRAINING
         if MODE == "train" and dataset == "phototourism":
@@ -158,7 +176,12 @@ if ROTATION_MATCHING:
             for image_fn in tqdm(img_list, desc=f"Rotating {dataset}/{scene}", ncols=80):
                 # predict rotation angle
                 path = str(paths.image_dir / image_fn)
-                angle = deep_orientation.predict("vit", path)
+
+                try:
+                    angle = deep_orientation.predict("vit", path)
+                except:
+                    logging.warning(f"Could not predict rotation for {dataset}/{scene}/{image_fn}")
+                    angle = np.random.choice([0, 90, 180, 270])
 
                 # round angle to closest multiple of 90° and save it for later
                 if angle < 0.0:

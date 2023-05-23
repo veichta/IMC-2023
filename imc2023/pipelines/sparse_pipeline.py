@@ -21,12 +21,21 @@ class SparsePipeline(Pipeline):
             logging.info(f"Features already at {feature_path}")
             return
 
-        extract_features.main(
-            conf=self.config["features"],
-            image_dir=image_dir,
-            image_list=self.img_list,
-            feature_path=feature_path,
-        )
+        if self.is_ensemble:
+            for config in self.config["features"]:
+                extract_features.main(
+                    conf=config,
+                    image_dir=image_dir,
+                    image_list=self.img_list,
+                    feature_path=feature_path.parent / config["output"],
+                )
+        else:
+            extract_features.main(
+                conf=self.config["features"],
+                image_dir=image_dir,
+                image_list=self.img_list,
+                feature_path=feature_path,
+            )
 
     def match_features(self) -> None:
         """Match features between images."""
@@ -41,9 +50,18 @@ class SparsePipeline(Pipeline):
             logging.info(f"Matches already at {self.paths.matches_path}")
             return
 
-        match_features.main(
-            conf=self.config["matches"],
-            pairs=self.paths.pairs_path,
-            features=feature_path,
-            matches=self.paths.matches_path,
-        )
+        if self.is_ensemble:
+            for feat_config, match_config in zip(self.config["features"], self.config["matches"]):
+                match_features.main(
+                    conf=match_config,
+                    pairs=self.paths.pairs_path,
+                    features=feature_path.parent / feat_config["output"],
+                    matches=self.paths.matches_path.parent / match_config["output"],
+                )
+        else:
+            match_features.main(
+                conf=self.config["matches"],
+                pairs=self.paths.pairs_path,
+                features=feature_path,
+                matches=self.paths.matches_path,
+            )

@@ -6,3 +6,9 @@ wheel_hloc:
 	python ext_deps/Hierarchical-Localization/setup.py bdist_wheel
 	mv dist/*.whl wheels/
 	rm -rf dist build
+
+
+wheel_dioad:
+	python ext_deps/dioad/setup.py bdist_wheel
+	mv dist/*.whl wheels/
+	rm -rf dist build

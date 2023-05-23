@@ -89,4 +89,54 @@ configs = {
         "retrieval": extract_features.confs["netvlad"],
         "n_retrieval": 50,
     },
+    "DISK+LG+sift+NN": {
+        "features": [extract_features.confs["disk"], extract_features.confs["sift"]],
+        "matches": [
+            {
+                "output": "matches-disk-lightglue",
+                "model": {
+                    "name": "lightglue",
+                    "weights": "disk_lightglue_legacy",
+                    "input_dim": 128,
+                    "flash": False,
+                    "filter_threshold": 0.1,
+                    "rotary": {
+                        "axial": True,
+                    },
+                },
+            },
+            match_features.confs["NN-ratio"],
+        ],
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
+    "DISK+SP+LG": {
+        "features": [extract_features.confs["disk"], extract_features.confs["superpoint_max"]],
+        "matches": [
+            {
+                "output": "matches-disk-lightglue",
+                "model": {
+                    "name": "lightglue",
+                    "weights": "disk_lightglue_legacy",
+                    "input_dim": 128,
+                    "flash": False,
+                    "filter_threshold": 0.1,
+                    "rotary": {
+                        "axial": True,
+                    },
+                },
+            },
+            {
+                "output": "matches-sp-lightglue",
+                "model": {
+                    "name": "lightglue",
+                    "weights": "superpoint_lightglue",
+                    "flash": False,
+                    "filter_threshold": 0.1,
+                },
+            },
+        ],
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
 }
