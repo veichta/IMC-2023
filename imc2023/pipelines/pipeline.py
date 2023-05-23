@@ -1,16 +1,17 @@
 """Abstract pipeline class."""
 import logging
 import shutil
-import h5py
-import cv2
 import subprocess
-import numpy as np
 from abc import abstractmethod
 from typing import Any, Dict, List
 
+import cv2
+import h5py
+import numpy as np
 import pycolmap
 from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
 
+from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
 
 
@@ -27,7 +28,7 @@ class Pipeline:
         pixsfm_config: str = "low_memory",
         pixsfm_timeout: int = 900,
         pixsfm_script_path: str = "/kaggle/working/run_pixsfm.py",
-        use_rotation_matching : bool = False,
+        use_rotation_matching: bool = False,
         rotation_angles: Dict[str, int] = None,
         overwrite: bool = False,
     ) -> None:
@@ -56,6 +57,15 @@ class Pipeline:
         self.pixsfm_script_path = pixsfm_script_path
         self.use_rotation_matching = use_rotation_matching
         self.overwrite = overwrite
+
+        self.is_ensemble = type(self.config["features"]) == list
+        if self.is_ensemble:
+            assert len(self.config["features"]) == len(
+                self.config["matches"]
+            ), "Number of features and matches must be equal for ensemble matching."
+            assert (
+                len(self.config["features"]) == 2
+            ), "Only two features are supported for ensemble matching."
 
         self.sparse_model = None
 
@@ -118,16 +128,46 @@ class Pipeline:
         """Match features between images."""
         pass
 
+    def create_ensemble(self) -> None:
+        """Concatenate features and matches."""
+        if not self.is_ensemble:
+            return
+
+        self.log_step("Creating ensemble")
+
+        feature_path = self.paths.features_path
+        if self.use_rotation_matching:
+            feature_path = self.paths.rotated_features_path
+
+        fpath1 = self.paths.features_path.parent / self.config["features"][0]["output"]
+        fpath2 = self.paths.features_path.parent / self.config["features"][1]["output"]
+
+        concat_features(
+            features1=fpath1,
+            features2=fpath2,
+            out_path=feature_path,
+        )
+
+        mpath1 = self.paths.matches_path.parent / self.config["matches"][0]["output"]
+        mpath2 = self.paths.matches_path.parent / self.config["matches"][1]["output"]
+
+        concat_matches(
+            matches1_path=mpath1,
+            matches2_path=mpath2,
+            ensemble_features_path=feature_path,
+            out_path=self.paths.matches_path,
+        )
+
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
         if not self.use_rotation_matching:
             return
-        
+
         self.log_step("Rotating keypoints")
 
         shutil.copy(self.paths.rotated_features_path, self.paths.features_path)
-        
-        with h5py.File(str(self.paths.features_path), 'r+', libver='latest') as f:
+
+        with h5py.File(str(self.paths.features_path), "r+", libver="latest") as f:
             for image_fn, angle in self.rotation_angles.items():
                 if angle == 0:
                     continue
@@ -237,5 +277,6 @@ class Pipeline:
         self.get_pairs()
         self.extract_features()
         self.match_features()
+        self.create_ensemble()
         self.rotate_keypoints()
         self.sfm()

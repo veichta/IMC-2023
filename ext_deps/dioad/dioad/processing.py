@@ -1,10 +1,14 @@
-from PIL import Image
-import numpy as np
-from transformers import ViTFeatureExtractor
-feature_extractor = ViTFeatureExtractor.from_pretrained('google/vit-base-patch16-224')
-from dioad.utils import rotate_preserve_size
-import os
+# from PIL import Image
 import datetime
+import os
+
+import cv2
+import numpy as np
+from dioad.utils import rotate_preserve_size
+from transformers import ViTFeatureExtractor
+
+feature_extractor = ViTFeatureExtractor.from_pretrained("google/vit-base-patch16-224")
+
 
 def preprocess(model_name, image_path):
     if model_name in ["vit", "tag-cnn"]:
@@ -12,10 +16,11 @@ def preprocess(model_name, image_path):
     else:
         image_size = 299
 
-    img = Image.open(image_path)
-    img = img.resize((image_size, image_size))
+    img = cv2.imread(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, (image_size, image_size))
     img = np.array(img)
-    
+
     if model_name == "vit":
         X_vit = [img]
         X_vit = feature_extractor(images=X_vit, return_tensors="pt")["pixel_values"]
@@ -35,8 +40,6 @@ def preprocess(model_name, image_path):
         X = img
 
     return X
-    
-
 
 
 def postprocess(img_path, angle, image_size, save_image_dir):

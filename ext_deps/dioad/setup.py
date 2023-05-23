@@ -1,4 +1,4 @@
 """Setup script for the project."""
-import setuptools
+from setuptools import find_packages, setup
 
-setuptools.setup()
+setup(name="dioad", version="1.0.0", packages=find_packages(include=["dioad", "dioad.*"]))
