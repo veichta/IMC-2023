@@ -35,7 +35,6 @@ parser.add_argument("--output", type=str, default="outputs", help="output dir")
 parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
 parser.add_argument("--pixsfm_max_imgs", type=int, default=9999, help="max number of images for PixSfM")
 parser.add_argument("--pixsfm_config", type=str, default="low_memory", help="PixSfM config")
-parser.add_argument("--pixsfm_timeout", type=int, default=900, help="timeout for pixsfm in seconds")
 parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
@@ -50,7 +49,6 @@ args = parser.parse_args()
 #     "pixsfm": False,
 #     "pixsfm_max_imgs": 9999,
 #     "pixsfm_config": "low_memory",
-#     "pixsfm_timeout": 900,
 #     "rotation_matching": False,
 #     "overwrite": False,
 # }
@@ -76,7 +74,6 @@ CONF_NAME = args.config
 PIXSFM = args.pixsfm
 PIXSFM_MAX_IMGS = args.pixsfm_max_imgs
 PIXSFM_CONFIG = args.pixsfm_config
-PIXSFM_TIMEOUT = args.pixsfm_timeout
 ROTATION_MATCHING = args.rotation_matching
 OVERWRITE = args.overwrite
 
@@ -263,7 +260,6 @@ for dataset in data_dict:
             use_pixsfm=PIXSFM,
             pixsfm_max_imgs=PIXSFM_MAX_IMGS,
             pixsfm_config=PIXSFM_CONFIG,
-            pixsfm_timeout=PIXSFM_TIMEOUT,
             use_rotation_matching=ROTATION_MATCHING,
             rotation_angles=rotation_angles[dataset][scene] if ROTATION_MATCHING else None,
             overwrite=OVERWRITE,

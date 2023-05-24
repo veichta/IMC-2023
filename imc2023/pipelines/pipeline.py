@@ -26,7 +26,6 @@ class Pipeline:
         use_pixsfm: bool = False,
         pixsfm_max_imgs: int = 9999,
         pixsfm_config: str = "low_memory",
-        pixsfm_timeout: int = 900,
         pixsfm_script_path: str = "/kaggle/working/run_pixsfm.py",
         use_rotation_matching: bool = False,
         rotation_angles: Dict[str, int] = None,
@@ -41,7 +40,6 @@ class Pipeline:
             use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
             pixsfm_max_imgs (int, optional): Max number of images for PixSFM. Defaults to 9999.
             pixsfm_config (str, optional): Which PixSFM config to use. Defaults to low_memory.
-            pixsfm_timeout (int, optional): Timeout for pixsfm in seconds. Defaults to 900.
             pixsfm_script_path (str, optional): Path to run_pixsfm.py. Needs to be changed for Euler.
             use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
             rotation_angles (Dict[str, int]): Angles to undo rotation of keypoints. Defaults to None.
@@ -53,7 +51,6 @@ class Pipeline:
         self.use_pixsfm = use_pixsfm
         self.pixsfm_max_imgs = pixsfm_max_imgs
         self.pixsfm_config = pixsfm_config
-        self.pixsfm_timeout = pixsfm_timeout
         self.pixsfm_script_path = pixsfm_script_path
         self.use_rotation_matching = use_rotation_matching
         self.overwrite = overwrite
@@ -225,9 +222,8 @@ class Pipeline:
                 stderr=subprocess.PIPE,
             )
             try:
-                logging.info("Starting timer for PixSfM...")
-                # there won't be any console output for up to `self.pixsfm_timeout` seconds...
-                output, error = proc.communicate(timeout=self.pixsfm_timeout)
+                logging.info("Running PixSfM in subprocess (no console output until PixSfM finishes)")
+                output, error = proc.communicate()
                 logging.info(output.decode())
                 logging.error(error.decode())
 
@@ -237,26 +233,8 @@ class Pipeline:
                         self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
                     except ValueError:
                         self.sparse_model = None
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                output, error = proc.communicate()
-                logging.info(output.decode())
-                logging.error(error.decode())
-
-                logging.warning("PixSfM timed out. Starting normal SfM...")
-                self.sparse_model = reconstruction.main(
-                    sfm_dir=self.paths.sfm_dir,
-                    image_dir=self.paths.image_dir,
-                    image_list=self.img_list,
-                    pairs=self.paths.pairs_path,
-                    features=self.paths.features_path,
-                    matches=self.paths.matches_path,
-                    verbose=False,
-                )
-                if self.sparse_model is not None:
-                    self.sparse_model.write(self.paths.sfm_dir)
-            except ValueError:
-                logging.warning("Could not reconstruct model.")
+            except Exception:
+                logging.warning("Could not reconstruct model with PixSfM.")
                 self.sparse_model = None
         else:
             self.sparse_model = reconstruction.main(
