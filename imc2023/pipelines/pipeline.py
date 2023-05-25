@@ -11,6 +11,7 @@ import h5py
 import numpy as np
 import pycolmap
 from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
+from hloc.utils.io import list_h5_names
 from pixsfm.refine_hloc import PixSfM
 
 from imc2023.preprocessing import preprocess_image_dir
@@ -170,6 +171,13 @@ class Pipeline:
             ensemble_features_path=feature_path,
             out_path=self.paths.matches_path,
         )
+
+        pairs = sorted(list(list_h5_names(self.paths.matches_path)))
+
+        with open(self.paths.pairs_path, "w") as f:
+            for pair in pairs:
+                p = pair.split("/")
+                f.write(f"{p[0]} {p[1]}\n")
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""

@@ -7,8 +7,6 @@ from typing import Any, Dict, List, Tuple
 import cv2
 import dioad.infer
 import numpy as np
-
-# from numba import cuda
 from tqdm import tqdm
 
 
@@ -25,7 +23,7 @@ def resize_image(image: np.ndarray, max_size: int) -> np.ndarray:
     img_size = image.shape[:2]
     if max(img_size) > max_size:
         ratio = max_size / max(img_size)
-        image = cv2.resize(image, (0, 0), fx=ratio, fy=ratio)
+        image = cv2.resize(image, (0, 0), fx=ratio, fy=ratio, interpolation=cv2.INTER_AREA)
     return image
 
 
