@@ -66,9 +66,23 @@ def get_output_dir(args: argparse.Namespace) -> Path:
     return output_dir
 
 
+def log_args(args: argparse.Namespace) -> None:
+    """Log arguments.
+
+    Args:
+        args (argparse.Namespace): Arguments.
+    """
+    logging.info("=" * 80)
+    logging.info("Arguments:")
+    logging.info("=" * 80)
+    for arg in vars(args):
+        logging.info(f"  {arg}: {getattr(args, arg)}")
+
+
 def main(args):
     start = time.time()
     setup_logger()
+    log_args(args)
 
     # PATHS
     data_dir = Path(args.data)

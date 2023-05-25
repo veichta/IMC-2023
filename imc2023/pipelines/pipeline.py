@@ -171,36 +171,6 @@ class Pipeline:
             out_path=self.paths.matches_path,
         )
 
-    def create_ensemble(self) -> None:
-        """Concatenate features and matches."""
-        if not self.is_ensemble:
-            return
-
-        self.log_step("Creating ensemble")
-
-        feature_path = self.paths.features_path
-        if self.use_rotation_matching:
-            feature_path = self.paths.rotated_features_path
-
-        fpath1 = self.paths.features_path.parent / self.config["features"][0]["output"]
-        fpath2 = self.paths.features_path.parent / self.config["features"][1]["output"]
-
-        concat_features(
-            features1=fpath1,
-            features2=fpath2,
-            out_path=feature_path,
-        )
-
-        mpath1 = self.paths.matches_path.parent / self.config["matches"][0]["output"]
-        mpath2 = self.paths.matches_path.parent / self.config["matches"][1]["output"]
-
-        concat_matches(
-            matches1_path=mpath1,
-            matches2_path=mpath2,
-            ensemble_features_path=feature_path,
-            out_path=self.paths.matches_path,
-        )
-
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
         if not self.use_rotation_matching:

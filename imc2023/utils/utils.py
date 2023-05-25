@@ -26,9 +26,14 @@ def setup_logger():
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
     tf.get_logger().setLevel("ERROR")
 
+    numexpr_logger = logging.getLogger("numexpr")
+    numexpr_logger.setLevel(logging.ERROR)
+
     warnings.filterwarnings(
         "ignore", category=FutureWarning, module="transformers.models.vit.feature_extraction_vit"
     )
+
+    warnings.filterwarnings("ignore", category=FutureWarning, module="torch.utils.data.dataloader")
 
 
 def arr_to_str(a):
