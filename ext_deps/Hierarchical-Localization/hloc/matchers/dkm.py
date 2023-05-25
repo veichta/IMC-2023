@@ -12,6 +12,7 @@ class DKM(BaseModel):
     default_conf = {
         "weights": "outdoor",
         "sample_num": 10000,
+        "match_threshold": 0.2,
         "max_num_matches": None,
     }
     required_inputs = ["image0", "image1"]
@@ -25,6 +26,7 @@ class DKM(BaseModel):
             self.net = DKMv3_indoor()
             self.W = 640
             self.H = 480
+        self.net.sample_thresh = conf["match_threshold"]
         self.img_transformer = T.ToPILImage("RGB")
 
     def _forward(self, data):
@@ -49,12 +51,17 @@ class DKM(BaseModel):
             )
 
         pred = {}
-        
-        kpts1, kpts2 = self.net.to_pixel_coordinates(kmatches, im1.size[1], im1.size[0], im2.size[1], im2.size[0])
-        
+
+        kpts1 = kmatches[:, :2]
+        kpts2 = kmatches[:, 2:]
+
+        kpts1, kpts2 = self.net.to_pixel_coordinates(
+            kmatches, im1.size[1], im1.size[0], im2.size[1], im2.size[0]
+        )
+
         top_k = self.conf["max_num_matches"]
         if top_k is not None and len(certainty_) > top_k:
-            keep = torch.argsort(certainty, descending=True)[:top_k]
+            keep = torch.argsort(certainty_, descending=True)[:top_k]
             pred["keypoints0"], pred["keypoints1"] = kpts1[keep, :], kpts2[keep, :]
             pred["scores"] = certainty_[keep]
         else:
