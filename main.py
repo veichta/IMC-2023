@@ -12,16 +12,12 @@ import json
 import logging
 import os
 import pickle
-import shutil
 from pathlib import Path
 
 import cv2
 import dioad.infer
 import numpy as np
-import pixsfm
 from numba import cuda
-from omegaconf import OmegaConf
-from PIL import Image
 from tqdm import tqdm
 
 from imc2023.configs import configs
@@ -37,6 +33,8 @@ parser.add_argument(
 )
 parser.add_argument("--output", type=str, default="outputs", help="output dir")
 parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
+parser.add_argument("--pixsfm_max_imgs", type=int, default=9999, help="max number of images for PixSfM")
+parser.add_argument("--pixsfm_config", type=str, default="low_memory", help="PixSfM config")
 parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
 parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
 args = parser.parse_args()
@@ -49,6 +47,8 @@ args = parser.parse_args()
 #     "mode": "train",
 #     "output": "/kaggle/temp",
 #     "pixsfm": False,
+#     "pixsfm_max_imgs": 9999,
+#     "pixsfm_config": "low_memory",
 #     "rotation_matching": False,
 #     "overwrite": False,
 # }
@@ -72,6 +72,8 @@ logger.propagate = False
 MODE = args.mode  # "train" or "test"
 CONF_NAME = args.config
 PIXSFM = args.pixsfm
+PIXSFM_MAX_IMGS = args.pixsfm_max_imgs
+PIXSFM_CONFIG = args.pixsfm_config
 ROTATION_MATCHING = args.rotation_matching
 OVERWRITE = args.overwrite
 
@@ -95,9 +97,6 @@ submission_csv_path = Path(f"{output_dir}/submission.csv")
 config = configs[CONF_NAME]
 with open(str(output_dir / "config.json"), "w") as jf:
     json.dump(config, jf, indent=4)
-
-if PIXSFM:
-    config["refinements"] = OmegaConf.load(pixsfm.configs.parse_config_path("low_memory"))
 
 logging.info("CONFIG:")
 for step, conf in config.items():
@@ -259,6 +258,8 @@ for dataset in data_dict:
             paths=paths,
             img_list=img_list,
             use_pixsfm=PIXSFM,
+            pixsfm_max_imgs=PIXSFM_MAX_IMGS,
+            pixsfm_config=PIXSFM_CONFIG,
             use_rotation_matching=ROTATION_MATCHING,
             rotation_angles=rotation_angles[dataset][scene] if ROTATION_MATCHING else None,
             overwrite=OVERWRITE,
