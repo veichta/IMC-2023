@@ -23,7 +23,7 @@ def resize_image(image: np.ndarray, max_size: int) -> np.ndarray:
     img_size = image.shape[:2]
     if max(img_size) > max_size:
         ratio = max_size / max(img_size)
-        image = cv2.resize(image, (0, 0), fx=ratio, fy=ratio, interpolation=cv2.INTER_AREA)
+        image = cv2.resize(image, (0, 0), fx=ratio, fy=ratio, interpolation=cv2.INTER_LANCZOS4)
     return image
 
 

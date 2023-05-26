@@ -36,6 +36,7 @@ from imc2023.utils.utils import (
 #     "pixsfm": False,
 #     "pixsfm_max_imgs": 9999,
 #     "pixsfm_config": "low_memory",
+#     "pixsfm_script_path: "/kaggle/working/run_pixsfm.py",
 #     "rotation_matching": False,
 #     "resize": 1600,
 #     "overwrite": False,
@@ -98,9 +99,6 @@ def main(args):
     config = configs[args.config]
     with open(str(output_dir / "config.json"), "w") as jf:
         json.dump(config, jf, indent=4)
-
-    if args.pixsfm:
-        config["refinements"] = OmegaConf.load(pixsfm.configs.parse_config_path("low_memory"))
 
     # SETUP DATA DICT
     data_dict = (
@@ -228,6 +226,9 @@ if __name__ == "__main__":
         "--pixsfm_max_imgs", type=int, default=9999, help="max number of images for PixSfM"
     )
     parser.add_argument("--pixsfm_config", type=str, default="low_memory", help="PixSfM config")
+    parser.add_argument(
+        "--pixsfm_script_path", type=str, default="run_pixsfm.py", help="PixSfM script path"
+    )
     parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
     parser.add_argument("--resize", type=int, help="resize images")
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
