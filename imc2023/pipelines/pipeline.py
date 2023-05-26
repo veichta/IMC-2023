@@ -2,6 +2,7 @@
 import argparse
 import logging
 import shutil
+import subprocess
 import time
 from abc import abstractmethod
 from typing import Any, Dict, List
@@ -12,7 +13,6 @@ import numpy as np
 import pycolmap
 from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
 from hloc.utils.io import list_h5_names
-from pixsfm.refine_hloc import PixSfM
 
 from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils.concatenate import concat_features, concat_matches
@@ -46,14 +46,20 @@ class Pipeline:
             config (Dict[str, Any]): Configuration dictionary.
             paths (DataPaths): Data paths.
             img_list (List[str]): List of image names.
-            use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
-            use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
+            # use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
+            # pixsfm_max_imgs (int, optional): Max number of images for PixSFM. Defaults to 9999.
+            # pixsfm_config (str, optional): Which PixSFM config to use. Defaults to low_memory.
+            # pixsfm_script_path (str, optional): Path to run_pixsfm.py. Needs to be changed for Euler.
+            # use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
             overwrite (bool, optional): Whether to overwrite previous output files. Defaults to False.
         """
         self.config = config
         self.paths = paths
         self.img_list = img_list
         self.use_pixsfm = args.pixsfm
+        self.pixsfm_max_imgs = args.pixsfm_max_imgs
+        self.pixsfm_config = args.pixsfm_config
+        self.pixsfm_script_path = args.pixsfm_script_path
         self.use_rotation_matching = args.rotation_matching
         self.overwrite = args.overwrite
         self.args = args
@@ -233,23 +239,50 @@ class Pipeline:
         logging.info(f"Using features from {self.paths.features_path}")
         logging.info(f"Using matches from {self.paths.matches_path}")
 
-        if self.use_pixsfm:
+        if self.use_pixsfm and len(self.img_list) <= self.pixsfm_max_imgs:
+            logging.info("Using PixSfM")
+
             if not self.paths.cache.exists():
                 self.paths.cache.mkdir(parents=True)
 
-            refiner = PixSfM(conf=self.config["refinements"])
+            proc = subprocess.Popen(
+                [
+                    "python",
+                    self.pixsfm_script_path,
+                    "--sfm_dir",
+                    str(self.paths.sfm_dir),
+                    "--image_dir",
+                    str(self.paths.image_dir),
+                    "--pairs_path",
+                    str(self.paths.pairs_path),
+                    "--features_path",
+                    str(self.paths.features_path),
+                    "--matches_path",
+                    str(self.paths.matches_path),
+                    "--cache_path",
+                    str(self.paths.cache),
+                    "--pixsfm_config",
+                    self.pixsfm_config,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
             try:
-                self.sparse_model, _ = refiner.run(
-                    output_dir=self.paths.sfm_dir,
-                    image_dir=self.paths.image_dir,
-                    pairs_path=self.paths.pairs_path,
-                    features_path=self.paths.features_path,
-                    matches_path=self.paths.matches_path,
-                    cache_path=self.paths.cache,
-                    verbose=False,
+                logging.info(
+                    "Running PixSfM in subprocess (no console output until PixSfM finishes)"
                 )
-            except ValueError:
-                logging.warning("Could not reconstruct model.")
+                output, error = proc.communicate()
+                logging.info(output.decode())
+                logging.error(error.decode())
+
+                # subprocess writes sfm model to disk => load model in main process
+                if self.paths.sfm_dir.exists():
+                    try:
+                        self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
+                    except ValueError:
+                        self.sparse_model = None
+            except Exception:
+                logging.warning("Could not reconstruct model with PixSfM.")
                 self.sparse_model = None
         else:
             self.sparse_model = reconstruction.main(

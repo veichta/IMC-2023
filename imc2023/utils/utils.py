@@ -181,8 +181,7 @@ class DataPaths:
         self.rotated_image_dir = self.scene_dir / "images_rotated"
         self.rotated_features_path = self.scene_dir / "features_rotated.h5"
 
-        # TODO: Update this.
-        self.cache = self.scene_dir / "cache"
+        self.cache = output_dir / "cache"
 
         # create directories
         self.scene_dir.mkdir(parents=True, exist_ok=True)
