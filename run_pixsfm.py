@@ -28,7 +28,7 @@ parser.add_argument("--pixsfm_config", type=str)
 parser.add_argument("--camera_mode", type=str, choices=["single", "auto"])
 args = parser.parse_args()
 
-if args.camera_model == "single":
+if args.camera_mode == "single":
     camera_mode = pycolmap.CameraMode.SINGLE
 else:
     camera_mode = pycolmap.CameraMode.AUTO
