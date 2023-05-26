@@ -54,7 +54,7 @@ def get_rotated_image(image: np.ndarray, angle: float) -> Tuple[np.ndarray, floa
 
 def preprocess_image_dir(
     input_dir: Path, output_dir: Path, image_list: List[str], args: argparse.Namespace
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], bool]:
     """Preprocess images in input_dir and save them to output_dir.
 
     Args:
@@ -64,11 +64,20 @@ def preprocess_image_dir(
         args (argparse.Namespace): Arguments.
 
     Returns:
-        dict[str, Any]: Dictionary containing the rotation angles for each image.
+        Tuple[Dict[str, Any], bool]: Dictionary mapping image file names to rotation angles and
+            whether all images have the same shape.
     """
+    same_shapes = True
+    prev_shape = None
+
     for image_fn in tqdm(image_list, desc=f"Rescaling {input_dir.name}", ncols=80):
         img_path = input_dir / "images" / image_fn
         image = cv2.imread(str(img_path))
+
+        if prev_shape is not None:
+            same_shapes &= prev_shape == image.shape
+
+        prev_shape = image.shape
 
         # resize image
         if args.resize is not None:
@@ -117,4 +126,6 @@ def preprocess_image_dir(
 
     logging.info(f"Rotated {n_rotated} of {n_total} images.")
 
-    return rotation_angles
+    logging.info(f"Images have same shapes: {same_shapes}.")
+
+    return rotation_angles, same_shapes

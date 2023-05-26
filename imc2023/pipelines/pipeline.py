@@ -62,6 +62,7 @@ class Pipeline:
         self.pixsfm_script_path = args.pixsfm_script_path
         self.use_rotation_matching = args.rotation_matching
         self.overwrite = args.overwrite
+        self.same_shapes = False
         self.args = args
 
         self.sparse_model = None
@@ -76,6 +77,7 @@ class Pipeline:
             ), "Only two features are supported for ensemble matching."
 
         self.rotation_angles = {}
+        self.n_rotated = 0
 
         self.timing = {
             "preprocess": 0,
@@ -101,7 +103,7 @@ class Pipeline:
     def preprocess(self) -> None:
         """Preprocess the images."""
         self.log_step("Preprocessing")
-        self.rotation_angles = preprocess_image_dir(
+        self.rotation_angles, self.same_shapes = preprocess_image_dir(
             input_dir=self.paths.input_dir,
             output_dir=self.paths.scene_dir,
             image_list=self.img_list,
@@ -187,8 +189,11 @@ class Pipeline:
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
+
         if not self.use_rotation_matching:
             return
+
+        self.n_rotated += 1
 
         self.log_step("Rotating keypoints")
 
@@ -234,12 +239,24 @@ class Pipeline:
             except ValueError:
                 self.sparse_model = None
 
+        camera_mode = pycolmap.CameraMode.AUTO
+        if self.same_shapes and self.args.shared_camera:
+            camera_mode = pycolmap.CameraMode.SINGLE
+
         logging.info(f"Using images from {self.paths.image_dir}")
         logging.info(f"Using pairs from {self.paths.pairs_path}")
         logging.info(f"Using features from {self.paths.features_path}")
         logging.info(f"Using matches from {self.paths.matches_path}")
+        logging.info(f"Using {camera_mode}")
 
-        if self.use_pixsfm and len(self.img_list) <= self.pixsfm_max_imgs:
+        pixsfm = (
+            self.use_pixsfm and len(self.img_list) <= self.pixsfm_max_imgs and self.n_rotated == 0
+        )
+
+        if self.n_rotated != 0 and self.use_pixsfm:
+            logging.info(f"Not using pixsfm because {self.n_rotated} rotated images are detected")
+
+        if pixsfm:
             logging.info("Using PixSfM")
 
             if not self.paths.cache.exists():
@@ -263,6 +280,8 @@ class Pipeline:
                     str(self.paths.cache),
                     "--pixsfm_config",
                     self.pixsfm_config,
+                    "--camera_mode",
+                    "auto" if camera_mode == pycolmap.CameraMode.AUTO else "single",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -292,6 +311,7 @@ class Pipeline:
                 pairs=self.paths.pairs_path,
                 features=self.paths.features_path,
                 matches=self.paths.matches_path,
+                camera_mode=camera_mode,
                 verbose=False,
             )
 

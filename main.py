@@ -37,6 +37,7 @@ from imc2023.utils.utils import (
 #     "pixsfm_script_path: "/kaggle/working/run_pixsfm.py",
 #     "rotation_matching": False,
 #     "resize": 1600,
+#     "shared_camera": False,
 #     "overwrite": False,
 #     "kaggle": True,
 # }
@@ -60,6 +61,8 @@ def get_output_dir(args: argparse.Namespace) -> Path:
         output_dir += "-pixsfm"
     if args.resize is not None:
         output_dir += f"-{args.resize}px"
+    if args.shared_camera:
+        output_dir += "-sci"
 
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -106,7 +109,6 @@ def main(args):
     )
 
     # RUN
-
     metrics = {}
     out_results = {}
 
@@ -229,6 +231,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
     parser.add_argument("--resize", type=int, help="resize images")
+    parser.add_argument("--shared_camera", action="store_true", help="use shared camera intrinsics")
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
     parser.add_argument("--kaggle", action="store_true", help="kaggle mode")
     args = parser.parse_args()

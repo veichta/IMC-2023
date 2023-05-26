@@ -152,7 +152,6 @@ configs = {
                     "input_dim": 128,
                     "flash": False,
                     "filter_threshold": 0.1,
-                    "early_stop_th": 0.95,
                     "rotary": {
                         "axial": True,
                     },
