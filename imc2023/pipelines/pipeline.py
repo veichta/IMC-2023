@@ -1,7 +1,9 @@
 """Abstract pipeline class."""
+import argparse
 import logging
 import shutil
 import subprocess
+import time
 from abc import abstractmethod
 from typing import Any, Dict, List
 
@@ -10,9 +12,22 @@ import h5py
 import numpy as np
 import pycolmap
 from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
+from hloc.utils.io import list_h5_names
 
+from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
+
+
+def time_function(func):
+    """Time a function."""
+
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        func(*args, **kwargs)
+        return time.time() - start
+
+    return wrapper
 
 
 class Pipeline:
@@ -23,13 +38,7 @@ class Pipeline:
         config: Dict[str, Any],
         paths: DataPaths,
         img_list: List[str],
-        use_pixsfm: bool = False,
-        pixsfm_max_imgs: int = 9999,
-        pixsfm_config: str = "low_memory",
-        pixsfm_script_path: str = "/kaggle/working/run_pixsfm.py",
-        use_rotation_matching: bool = False,
-        rotation_angles: Dict[str, int] = None,
-        overwrite: bool = False,
+        args: argparse.Namespace,
     ) -> None:
         """Initialize the pipeline.
 
@@ -37,23 +46,25 @@ class Pipeline:
             config (Dict[str, Any]): Configuration dictionary.
             paths (DataPaths): Data paths.
             img_list (List[str]): List of image names.
-            use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
-            pixsfm_max_imgs (int, optional): Max number of images for PixSFM. Defaults to 9999.
-            pixsfm_config (str, optional): Which PixSFM config to use. Defaults to low_memory.
-            pixsfm_script_path (str, optional): Path to run_pixsfm.py. Needs to be changed for Euler.
-            use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
-            rotation_angles (Dict[str, int]): Angles to undo rotation of keypoints. Defaults to None.
+            # use_pixsfm (bool, optional): Whether to use PixSFM. Defaults to False.
+            # pixsfm_max_imgs (int, optional): Max number of images for PixSFM. Defaults to 9999.
+            # pixsfm_config (str, optional): Which PixSFM config to use. Defaults to low_memory.
+            # pixsfm_script_path (str, optional): Path to run_pixsfm.py. Needs to be changed for Euler.
+            # use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
             overwrite (bool, optional): Whether to overwrite previous output files. Defaults to False.
         """
         self.config = config
         self.paths = paths
         self.img_list = img_list
-        self.use_pixsfm = use_pixsfm
-        self.pixsfm_max_imgs = pixsfm_max_imgs
-        self.pixsfm_config = pixsfm_config
-        self.pixsfm_script_path = pixsfm_script_path
-        self.use_rotation_matching = use_rotation_matching
-        self.overwrite = overwrite
+        self.use_pixsfm = args.pixsfm
+        self.pixsfm_max_imgs = args.pixsfm_max_imgs
+        self.pixsfm_config = args.pixsfm_config
+        self.pixsfm_script_path = args.pixsfm_script_path
+        self.use_rotation_matching = args.rotation_matching
+        self.overwrite = args.overwrite
+        self.args = args
+
+        self.sparse_model = None
 
         self.is_ensemble = type(self.config["features"]) == list
         if self.is_ensemble:
@@ -64,9 +75,18 @@ class Pipeline:
                 len(self.config["features"]) == 2
             ), "Only two features are supported for ensemble matching."
 
-        self.sparse_model = None
+        self.rotation_angles = {}
 
-        self.rotation_angles = rotation_angles
+        self.timing = {
+            "preprocess": 0,
+            "get_pairs": 0,
+            "extract_features": 0,
+            "match_features": 0,
+            "create_ensemble": 0,
+            "rotate_keypoints": 0,
+            "sfm": 0,
+            "localize_unregistered": 0,
+        }
 
     def log_step(self, title: str) -> None:
         """Log a title.
@@ -80,7 +100,13 @@ class Pipeline:
 
     def preprocess(self) -> None:
         """Preprocess the images."""
-        pass
+        self.log_step("Preprocessing")
+        self.rotation_angles = preprocess_image_dir(
+            input_dir=self.paths.input_dir,
+            output_dir=self.paths.scene_dir,
+            image_list=self.img_list,
+            args=self.args,
+        )
 
     def get_pairs(self) -> None:
         """Get pairs of images to match."""
@@ -92,6 +118,7 @@ class Pipeline:
 
         if self.paths.pairs_path.exists() and not self.overwrite:
             logging.info(f"Pairs already at {self.paths.pairs_path}")
+            return
         else:
             if self.use_rotation_matching:
                 image_dir = self.paths.rotated_image_dir
@@ -104,10 +131,6 @@ class Pipeline:
                 image_list=self.img_list,
                 feature_path=self.paths.features_retrieval,
             )
-
-        if self.paths.pairs_path.exists() and not self.overwrite:
-            logging.info(f"Pairs already at {self.paths.pairs_path}")
-            return
 
         pairs_from_retrieval.main(
             descriptors=self.paths.features_retrieval,
@@ -136,8 +159,8 @@ class Pipeline:
         if self.use_rotation_matching:
             feature_path = self.paths.rotated_features_path
 
-        fpath1 = self.paths.features_path.parent / self.config["features"][0]["output"]
-        fpath2 = self.paths.features_path.parent / self.config["features"][1]["output"]
+        fpath1 = self.paths.features_path.parent / f'{self.config["features"][0]["output"]}.h5'
+        fpath2 = self.paths.features_path.parent / f'{self.config["features"][1]["output"]}.h5'
 
         concat_features(
             features1=fpath1,
@@ -145,8 +168,8 @@ class Pipeline:
             out_path=feature_path,
         )
 
-        mpath1 = self.paths.matches_path.parent / self.config["matches"][0]["output"]
-        mpath2 = self.paths.matches_path.parent / self.config["matches"][1]["output"]
+        mpath1 = self.paths.matches_path.parent / f'{self.config["matches"][0]["output"]}.h5'
+        mpath2 = self.paths.matches_path.parent / f'{self.config["matches"][1]["output"]}.h5'
 
         concat_matches(
             matches1_path=mpath1,
@@ -155,6 +178,13 @@ class Pipeline:
             out_path=self.paths.matches_path,
         )
 
+        pairs = sorted(list(list_h5_names(self.paths.matches_path)))
+
+        with open(self.paths.pairs_path, "w") as f:
+            for pair in pairs:
+                p = pair.split("/")
+                f.write(f"{p[0]} {p[1]}\n")
+
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
         if not self.use_rotation_matching:
@@ -162,8 +192,10 @@ class Pipeline:
 
         self.log_step("Rotating keypoints")
 
+        logging.info(f"Using rotated features from {self.paths.rotated_features_path}")
         shutil.copy(self.paths.rotated_features_path, self.paths.features_path)
 
+        logging.info(f"Writing rotated keypoints to {self.paths.features_path}")
         with h5py.File(str(self.paths.features_path), "r+", libver="latest") as f:
             for image_fn, angle in self.rotation_angles.items():
                 if angle == 0:
@@ -197,9 +229,15 @@ class Pipeline:
         if self.paths.sfm_dir.exists() and not self.overwrite:
             try:
                 self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
+                logging.info(f"Sparse model already at {self.paths.sfm_dir}")
                 return
             except ValueError:
                 self.sparse_model = None
+
+        logging.info(f"Using images from {self.paths.image_dir}")
+        logging.info(f"Using pairs from {self.paths.pairs_path}")
+        logging.info(f"Using features from {self.paths.features_path}")
+        logging.info(f"Using matches from {self.paths.matches_path}")
 
         if self.use_pixsfm and len(self.img_list) <= self.pixsfm_max_imgs:
             logging.info("Using PixSfM")
@@ -209,20 +247,30 @@ class Pipeline:
 
             proc = subprocess.Popen(
                 [
-                    "python", self.pixsfm_script_path, 
-                    "--sfm_dir", str(self.paths.sfm_dir),
-                    "--image_dir", str(self.paths.image_dir),
-                    "--pairs_path", str(self.paths.pairs_path),
-                    "--features_path", str(self.paths.features_path),
-                    "--matches_path", str(self.paths.matches_path),
-                    "--cache_path", str(self.paths.cache),
-                    "--pixsfm_config", self.pixsfm_config,
+                    "python",
+                    self.pixsfm_script_path,
+                    "--sfm_dir",
+                    str(self.paths.sfm_dir),
+                    "--image_dir",
+                    str(self.paths.image_dir),
+                    "--pairs_path",
+                    str(self.paths.pairs_path),
+                    "--features_path",
+                    str(self.paths.features_path),
+                    "--matches_path",
+                    str(self.paths.matches_path),
+                    "--cache_path",
+                    str(self.paths.cache),
+                    "--pixsfm_config",
+                    self.pixsfm_config,
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
             try:
-                logging.info("Running PixSfM in subprocess (no console output until PixSfM finishes)")
+                logging.info(
+                    "Running PixSfM in subprocess (no console output until PixSfM finishes)"
+                )
                 output, error = proc.communicate()
                 logging.info(output.decode())
                 logging.error(error.decode())
@@ -246,15 +294,23 @@ class Pipeline:
                 matches=self.paths.matches_path,
                 verbose=False,
             )
-            if self.sparse_model is not None:
-                self.sparse_model.write(self.paths.sfm_dir)
+
+        if self.sparse_model is not None:
+            self.sparse_model.write(self.paths.sfm_dir)
+
+    def localize_unregistered(self) -> None:
+        """Try to localize unregistered images."""
+        pass
 
     def run(self) -> None:
         """Run the pipeline."""
-        self.preprocess()
-        self.get_pairs()
-        self.extract_features()
-        self.match_features()
-        self.create_ensemble()
-        self.rotate_keypoints()
-        self.sfm()
+        self.timing = {
+            "preprocessing": time_function(self.preprocess)(),
+            "pairs-extraction": time_function(self.get_pairs)(),
+            "feature-extraction": time_function(self.extract_features)(),
+            "feature-matching": time_function(self.match_features)(),
+            "create-ensemble": time_function(self.create_ensemble)(),
+            "rotate-keypoints": time_function(self.rotate_keypoints)(),
+            "sfm": time_function(self.sfm)(),
+            "localize-unreg": time_function(self.localize_unregistered)(),
+        }

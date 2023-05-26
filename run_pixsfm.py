@@ -1,15 +1,19 @@
 import sys
-sys.path.append("ext_deps/Hierarchical-Localization") # for Euler
-sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/Hierarchical-Localization") # for Kaggle
-sys.path.append("/kaggle/input/imc-23-repo-tmp/IMC-2023-TMP/ext_deps/Hierarchical-Localization") # TODO: Remove this line
+
+sys.path.append("ext_deps/Hierarchical-Localization")  # for Euler
+sys.path.append(
+    "/kaggle/input/imc-23-repo/IMC-2023/ext_deps/Hierarchical-Localization"
+)  # for Kaggle
+sys.path.append(
+    "/kaggle/input/imc-23-repo-tmp/IMC-2023-TMP/ext_deps/Hierarchical-Localization"
+)  # TODO: Remove this line
 
 import argparse
 from pathlib import Path
-from omegaconf import OmegaConf
 
 import pixsfm
+from omegaconf import OmegaConf
 from pixsfm.refine_hloc import PixSfM
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--sfm_dir", type=str)
@@ -34,3 +38,7 @@ sparse_model, _ = refiner.run(
 
 if sparse_model is not None:
     sparse_model.write(Path(args.sfm_dir))
+
+# clear cache
+for file in Path(args.cache_path).glob("*"):
+    file.unlink()

@@ -1,10 +1,12 @@
 import argparse
+import logging
 from dataclasses import dataclass
 from time import time
 
+import numpy as np
+
 # Eval train submission
 # https://www.kaggle.com/code/eduardtrulls/imc2023-evaluation
-import numpy as np
 
 
 # Conveniency functions.
@@ -136,7 +138,7 @@ def eval_submission(
     # Iterate over all the scenes
     if verbose:
         t = time()
-        print("*** METRICS ***")
+        logging.info("*** METRICS ***")
 
     all_metrics = {}
     metrics_per_dataset = []
@@ -172,8 +174,11 @@ def eval_submission(
                 ths_t=translation_thresholds_meters_dict[(dataset, scene)],
             )
             if verbose:
-                print(
-                    f"{dataset} / {scene} ({len(images)} images, {len(err_q_all)} pairs) -> mAA={np.mean(mAA):.06f}, mAA_q={np.mean(mAA_q):.06f}, mAA_t={np.mean(mAA_t):.06f}"
+                logging.info(
+                    f"{dataset} / {scene} ({len(images)} images, {len(err_q_all)} pairs) -> "
+                    + f"mAA={np.mean(mAA):.06f}, "
+                    + f"mAA_q={np.mean(mAA_q):.06f}, "
+                    + f"mAA_t={np.mean(mAA_t):.06f}"
                 )
             metrics_per_scene.append(np.mean(mAA))
             all_metrics[dataset][scene]["mAA"] = float(np.mean(mAA))
@@ -184,12 +189,12 @@ def eval_submission(
         all_metrics[dataset]["mAA"] = float(np.mean(metrics_per_scene))
 
         if verbose:
-            print(f"{dataset} -> mAA={np.mean(metrics_per_scene):.06f}")
-            print()
+            logging.info(f"{dataset} -> mAA={np.mean(metrics_per_scene):.06f}")
 
     if verbose:
-        print(f"Final metric -> mAA={np.mean(metrics_per_dataset):.06f} (t: {time() - t} sec.)")
-        print()
+        logging.info(
+            f"Final metric -> mAA={np.mean(metrics_per_dataset):.06f} (t: {time() - t} sec.)"
+        )
 
     all_metrics["mAA"] = float(np.mean(metrics_per_dataset))
     if return_dict:
@@ -206,7 +211,7 @@ def eval(
     Args:
         submission_csv (str): Path to submission csv file.
         data_dir (str): Path to data directory.
-        verbose (bool): Whether to print metrics. Defaults to True.
+        verbose (bool): Whether to logging.info metrics. Defaults to True.
         return_dict (bool): Whether to return a dictionary with all metrics. Defaults to False.
 
     Returns:

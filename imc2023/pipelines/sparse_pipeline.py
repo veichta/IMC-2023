@@ -17,17 +17,23 @@ class SparsePipeline(Pipeline):
             feature_path = self.paths.features_path
             image_dir = self.paths.image_dir
 
-        if feature_path.exists():
-            logging.info(f"Features already at {feature_path}")
-            return
+        if feature_path.exists() and self.overwrite:
+            logging.info(f"Removing {feature_path}")
+            feature_path.unlink()
 
         if self.is_ensemble:
             for config in self.config["features"]:
+                ens_feature_path = feature_path.parent / f'{config["output"]}.h5'
+
+                if ens_feature_path.exists() and self.overwrite:
+                    logging.info(f"Removing {ens_feature_path}")
+                    ens_feature_path.unlink()
+
                 extract_features.main(
                     conf=config,
                     image_dir=image_dir,
                     image_list=self.img_list,
-                    feature_path=feature_path.parent / config["output"],
+                    feature_path=ens_feature_path,
                 )
         else:
             extract_features.main(
@@ -46,17 +52,24 @@ class SparsePipeline(Pipeline):
         else:
             feature_path = self.paths.features_path
 
-        if self.paths.matches_path.exists():
-            logging.info(f"Matches already at {self.paths.matches_path}")
-            return
+        if self.paths.matches_path.exists() and self.overwrite:
+            logging.info(f"Removing {self.paths.matches_path}")
+            self.paths.matches_path.unlink()
 
         if self.is_ensemble:
             for feat_config, match_config in zip(self.config["features"], self.config["matches"]):
+                ens_feature_path = feature_path.parent / f'{feat_config["output"]}.h5'
+                ens_match_path = self.paths.matches_path.parent / f'{match_config["output"]}.h5'
+
+                if ens_match_path.exists() and self.overwrite:
+                    logging.info(f"Removing {ens_match_path}")
+                    ens_match_path.unlink()
+
                 match_features.main(
                     conf=match_config,
                     pairs=self.paths.pairs_path,
-                    features=feature_path.parent / feat_config["output"],
-                    matches=self.paths.matches_path.parent / match_config["output"],
+                    features=ens_feature_path,
+                    matches=ens_match_path,
                 )
         else:
             match_features.main(

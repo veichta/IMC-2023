@@ -1,10 +1,14 @@
-# from PIL import Image
 import datetime
+import logging
 import os
 
 import cv2
 import numpy as np
 from dioad.utils import rotate_preserve_size
+
+logger = logging.getLogger("transformers")
+logger.setLevel(logging.ERROR)
+
 from transformers import ViTFeatureExtractor
 
 feature_extractor = ViTFeatureExtractor.from_pretrained("google/vit-base-patch16-224")
