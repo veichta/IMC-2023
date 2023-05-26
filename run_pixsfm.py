@@ -1,12 +1,13 @@
 import sys
 
-sys.path.append("ext_deps/Hierarchical-Localization")  # for Euler
-sys.path.append(
-    "/kaggle/input/imc-23-repo/IMC-2023/ext_deps/Hierarchical-Localization"
-)  # for Kaggle
-sys.path.append(
-    "/kaggle/input/imc-23-repo-tmp/IMC-2023-TMP/ext_deps/Hierarchical-Localization"
-)  # TODO: Remove this line
+# for Euler
+sys.path.append("ext_deps/Hierarchical-Localization")
+
+# for Kaggle
+sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/Hierarchical-Localization")
+
+# TODO: Remove this line
+sys.path.append("/kaggle/input/imc-23-repo-tmp/IMC-2023-TMP/ext_deps/Hierarchical-Localization")
 
 import argparse
 from pathlib import Path

@@ -24,25 +24,38 @@ from imc2023.utils.utils import (
     setup_logger,
 )
 
-# os.makedirs("/kaggle/temp", exist_ok=True)
+## Kaggle version
+# import sys
+
+# sys.path.append("/kaggle/input/imc-23-repo/IMC-2023")
+# sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/Hierarchical-Localization")
+# sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/dioad")
+
+# import os
+# import argparse
+
+# from main import main
 
 # args = {
 #     "data": "/kaggle/input/image-matching-challenge-2023",
-#     "config": "DISK+LG",
+#     "config": "SP+LG+sift+NN",
 #     "mode": "train",
 #     "output": "/kaggle/temp",
-#     "pixsfm": False,
+#     "pixsfm": True,
 #     "pixsfm_max_imgs": 9999,
 #     "pixsfm_config": "low_memory",
-#     "pixsfm_script_path: "/kaggle/working/run_pixsfm.py",
-#     "rotation_matching": False,
-#     "resize": 1600,
-#     "shared_camera": False,
-#     "overwrite": False,
+#     "pixsfm_script_path": "/kaggle/input/imc-23-repo/IMC-2023/run_pixsfm.py",
+#     "rotation_matching": True,
+#     "resize": None,
+#     "shared_camera": True,
+#     "overwrite": True,
 #     "kaggle": True,
 # }
 
 # args = argparse.Namespace(**args)
+# os.makedirs(args.output, exist_ok=True)
+
+# main(args)
 
 
 def get_output_dir(args: argparse.Namespace) -> Path:

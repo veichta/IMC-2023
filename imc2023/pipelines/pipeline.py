@@ -193,8 +193,6 @@ class Pipeline:
         if not self.use_rotation_matching:
             return
 
-        self.n_rotated += 1
-
         self.log_step("Rotating keypoints")
 
         logging.info(f"Using rotated features from {self.paths.rotated_features_path}")
@@ -205,6 +203,8 @@ class Pipeline:
             for image_fn, angle in self.rotation_angles.items():
                 if angle == 0:
                     continue
+
+                self.n_rotated += 1
 
                 keypoints = f[image_fn]["keypoints"].__array__()
                 y_max, x_max = cv2.imread(str(self.paths.rotated_image_dir / image_fn)).shape[:2]
