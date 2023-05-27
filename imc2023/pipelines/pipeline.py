@@ -61,6 +61,7 @@ class Pipeline:
         self.pixsfm_config = args.pixsfm_config
         self.pixsfm_script_path = args.pixsfm_script_path
         self.use_rotation_matching = args.rotation_matching
+        self.use_rotation_wrapper = args.rotation_wrapper
         self.overwrite = args.overwrite
         self.args = args
 
@@ -120,7 +121,7 @@ class Pipeline:
             logging.info(f"Pairs already at {self.paths.pairs_path}")
             return
         else:
-            if self.use_rotation_matching:
+            if self.use_rotation_matching or self.use_rotation_wrapper:
                 image_dir = self.paths.rotated_image_dir
             else:
                 image_dir = self.paths.image_dir
@@ -184,6 +185,10 @@ class Pipeline:
             for pair in pairs:
                 p = pair.split("/")
                 f.write(f"{p[0]} {p[1]}\n")
+
+    def back_rotate_cameras(self):
+        """Rotate R and t for each rotated camera. """
+        pass
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
@@ -312,5 +317,6 @@ class Pipeline:
             "create-ensemble": time_function(self.create_ensemble)(),
             "rotate-keypoints": time_function(self.rotate_keypoints)(),
             "sfm": time_function(self.sfm)(),
+            "back-rotate-cameras":time_function(self.rotate_cameras()),
             "localize-unreg": time_function(self.localize_unregistered)(),
         }

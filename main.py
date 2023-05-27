@@ -130,7 +130,8 @@ def main(args):
             logging.info("=" * 80)
             logging.info(f"{dataset} - {scene}")
             logging.info("=" * 80)
-
+            if scene != "cyprus":
+                continue
             start_scene = time.time()
 
             # SETUP PATHS
@@ -228,6 +229,7 @@ if __name__ == "__main__":
         "--pixsfm_script_path", type=str, default="run_pixsfm.py", help="PixSfM script path"
     )
     parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
+    parser.add_argument("--rotation_wrapper", action="store_true", help="wrapper implementation of rotation matching")
     parser.add_argument("--resize", type=int, help="resize images")
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
     parser.add_argument("--kaggle", action="store_true", help="kaggle mode")
