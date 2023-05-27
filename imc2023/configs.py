@@ -59,6 +59,20 @@ configs = {
         "retrieval": extract_features.confs["netvlad"],
         "n_retrieval": 50,
     },
+    "SP+LG-flash": {
+        "features": extract_features.confs["superpoint_max"],
+        "matches": {
+            "output": "matches-sp-lightglue",
+            "model": {
+                "name": "lightglue",
+                "weights": "superpoint_lightglue",
+                "flash": True,
+                "filter_threshold": 0.1,
+            },
+        },
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
     "SP+LG+exhaustive": {
         "features": extract_features.confs["superpoint_max"],
         "matches": {

@@ -10,8 +10,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 try:
-    from flash_attn.flash_attention import FlashAttention as _FlashAttention
-    from flash_attn.modules.mha import FlashCrossAttention
+    from flash import flash_attn_qkvpacked_func, flash_attn_kvpacked_func
 except ModuleNotFoundError:
     print('Module flash_attn not found. Disabling FlashAttention.')
 
@@ -212,10 +211,9 @@ class FastAttention(nn.Module):
 class FlashAttention(nn.Module):
     def __init__(self, dim: int):
         super().__init__()
-        self.flash = _FlashAttention()
 
     def forward(self, q, k, v, weights=None):
-        return self.flash(torch.stack([q, k, v], 2).bfloat16())[0].to(q.dtype)
+        return flash_attn_qkvpacked_func(torch.stack([q, k, v], 2).half()).to(q.dtype)
 
 
 class Transformer(nn.Module):
@@ -291,7 +289,7 @@ class CrossTransformer(nn.Module):
         )
 
         if flash:
-            self.flash = FlashCrossAttention()
+            self.flash = flash_attn_kvpacked_func
         else:
             self.flash = None
 
