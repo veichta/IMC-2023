@@ -1,0 +1,12 @@
+numpy
+torch
+torchvision
+torchaudio
+opencv-python
+tqdm
+scikit-learn
+scikit-image
+matplotlib
+tensorflow
+transformers
+numba
