@@ -17,7 +17,7 @@ from hloc.utils.io import list_h5_names
 from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
-
+from imc2023.utils import rot_mat_z
 
 def time_function(func):
     """Time a function."""
@@ -87,6 +87,7 @@ class Pipeline:
             "rotate_keypoints": 0,
             "sfm": 0,
             "localize_unregistered": 0,
+            "back-rotate-cameras":0
         }
 
     def log_step(self, title: str) -> None:
@@ -188,7 +189,22 @@ class Pipeline:
 
     def back_rotate_cameras(self):
         """Rotate R and t for each rotated camera. """
-        pass
+        if not self.use_rotation_wrapper:
+            return
+        self.log_step("Back-rotate camera poses")
+
+        if self.paths.sfm_dir.exists() and not self.overwrite:
+            try:
+                self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
+                logging.info(f"Sparse model already at {self.paths.sfm_dir}")
+                return
+            except ValueError:
+                self.sparse_model = None
+
+        for image_fn, angle in self.rotation_angles.items():
+            if angle !=0:
+                print(f"back rotate {image_fn} by {angle}")
+                rot_mat = rot_mat_z(angle)
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
@@ -317,6 +333,6 @@ class Pipeline:
             "create-ensemble": time_function(self.create_ensemble)(),
             "rotate-keypoints": time_function(self.rotate_keypoints)(),
             "sfm": time_function(self.sfm)(),
-            "back-rotate-cameras":time_function(self.rotate_cameras()),
+            "back-rotate-cameras":time_function(self.back_rotate_cameras)(),
             "localize-unreg": time_function(self.localize_unregistered)(),
         }
