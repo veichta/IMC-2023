@@ -15,7 +15,10 @@ class SparsePipeline(Pipeline):
             image_dir = self.paths.rotated_image_dir
         elif self.use_rotation_wrapper:
             feature_path = self.paths.features_path
+            # swap the two image folders
             image_dir = self.paths.rotated_image_dir
+            self.paths.rotated_image_dir = self.paths.image_dir
+            self.paths.image_dir = image_dir
         else:
             feature_path = self.paths.features_path
             image_dir = self.paths.image_dir

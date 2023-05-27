@@ -145,8 +145,7 @@ def main(args):
             logging.info("=" * 80)
             logging.info(f"{dataset} - {scene}")
             logging.info("=" * 80)
-            if scene != "cyprus":
-                continue
+            
             start_scene = time.time()
 
             # SETUP PATHS
