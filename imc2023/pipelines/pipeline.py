@@ -205,7 +205,10 @@ class Pipeline:
                 self.sparse_model.images[id].tvec = rotmat @t
                 self.sparse_model.images[id].qvec = rotmat2qvec(rotmat @ R)
         self.sparse_model.write(self.paths.sfm_dir)
-
+        # swap the two image folders
+        image_dir = self.paths.rotated_image_dir
+        self.paths.rotated_image_dir = self.paths.image_dir
+        self.paths.image_dir = image_dir
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
@@ -248,7 +251,7 @@ class Pipeline:
         """Run Structure from Motion."""
         self.log_step("Run SfM")
 
-        if False:#self.paths.sfm_dir.exists() and not self.overwrite:
+        if self.paths.sfm_dir.exists() and not self.overwrite:
             try:
                 self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
                 logging.info(f"Sparse model already at {self.paths.sfm_dir}")
@@ -306,11 +309,10 @@ class Pipeline:
             except Exception:
                 logging.warning("Could not reconstruct model with PixSfM.")
                 self.sparse_model = None
-        else:
-            img_dir = self.paths.image_dir if not self.use_rotation_wrapper else self.paths.rotated_image_dir
+        else: 
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
-                image_dir=img_dir,
+                image_dir=self.paths.image_dir,
                 image_list=self.img_list,
                 pairs=self.paths.pairs_path,
                 features=self.paths.features_path,
