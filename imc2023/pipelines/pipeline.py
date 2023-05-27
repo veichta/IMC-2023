@@ -17,7 +17,7 @@ from hloc.utils.io import list_h5_names
 from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
-from imc2023.utils import rot_mat_z
+from imc2023.utils import rot_mat_z, rotmat2qvec
 
 def time_function(func):
     """Time a function."""
@@ -193,18 +193,18 @@ class Pipeline:
             return
         self.log_step("Back-rotate camera poses")
 
-        if self.paths.sfm_dir.exists() and not self.overwrite:
-            try:
-                self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
-                logging.info(f"Sparse model already at {self.paths.sfm_dir}")
-                return
-            except ValueError:
-                self.sparse_model = None
-
-        for image_fn, angle in self.rotation_angles.items():
+        for id, im in self.sparse_model.images.items():
+            angle = self.rotation_angles[im.name]
             if angle !=0:
-                print(f"back rotate {image_fn} by {angle}")
-                rot_mat = rot_mat_z(angle)
+                # back rotate <Image 'image_id=30, camera_id=30, name="DSC_6633.JPG", triangulated=404/3133'> by 90
+                logging.info(f"back rotate {im} by {angle}")
+                rotmat = rot_mat_z(angle)
+                R = im.rotmat()
+                t = np.array(im.tvec)
+                self.sparse_model.images[id].tvec = rotmat@t
+                self.sparse_model.images[id].qvec = rotmat2qvec(R@rotmat)
+        self.sparse_model.write(self.paths.sfm_dir)
+
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
