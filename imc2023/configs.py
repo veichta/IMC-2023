@@ -168,6 +168,6 @@ configs = {
             },
         ],
         "retrieval": extract_features.confs["netvlad"],
-        "n_retrieval": 50,
+        "n_retrieval": 30,
     },
 }
