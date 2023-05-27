@@ -15,9 +15,10 @@ from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, 
 from hloc.utils.io import list_h5_names
 
 from imc2023.preprocessing import preprocess_image_dir
+from imc2023.utils import rot_mat_z, rotmat2qvec
 from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
-from imc2023.utils import rot_mat_z, rotmat2qvec
+
 
 def time_function(func):
     """Time a function."""
@@ -90,7 +91,7 @@ class Pipeline:
             "rotate_keypoints": 0,
             "sfm": 0,
             "localize_unregistered": 0,
-            "back-rotate-cameras":0
+            "back-rotate-cameras": 0,
         }
 
     def log_step(self, title: str) -> None:
@@ -191,20 +192,20 @@ class Pipeline:
                 f.write(f"{p[0]} {p[1]}\n")
 
     def back_rotate_cameras(self):
-        """Rotate R and t for each rotated camera. """
+        """Rotate R and t for each rotated camera."""
         if not self.use_rotation_wrapper:
             return
         self.log_step("Back-rotate camera poses")
         for id, im in self.sparse_model.images.items():
             angle = self.rotation_angles[im.name]
-            if angle !=0:
+            if angle != 0:
                 # back rotate <Image 'image_id=30, camera_id=30, name="DSC_6633.JPG", triangulated=404/3133'> by 90
                 # logging.info(f"back rotate {im} by {angle}")
                 rotmat = rot_mat_z(angle)
                 # logging.info(rotmat)
                 R = im.rotmat()
                 t = np.array(im.tvec)
-                self.sparse_model.images[id].tvec = rotmat @t
+                self.sparse_model.images[id].tvec = rotmat @ t
                 self.sparse_model.images[id].qvec = rotmat2qvec(rotmat @ R)
         # self.sparse_model.write(self.paths.sfm_dir)
         # swap the two image folders
@@ -239,16 +240,16 @@ class Pipeline:
                     # rotate keypoints by -90 degrees
                     # ==> (x,y) becomes (y, x_max - x)
                     new_keypoints[:, 0] = keypoints[:, 1]
-                    new_keypoints[:, 1] = x_max - keypoints[:, 0]-1
+                    new_keypoints[:, 1] = x_max - keypoints[:, 0] - 1
                 elif angle == 180:
                     # rotate keypoints by 180 degrees
                     # ==> (x,y) becomes (x_max - x, y_max - y)
-                    new_keypoints[:, 0] = x_max - keypoints[:, 0]-1
-                    new_keypoints[:, 1] = y_max - keypoints[:, 1]-1
+                    new_keypoints[:, 0] = x_max - keypoints[:, 0] - 1
+                    new_keypoints[:, 1] = y_max - keypoints[:, 1] - 1
                 elif angle == 270:
                     # rotate keypoints by +90 degrees
                     # ==> (x,y) becomes (y_max - y, x)
-                    new_keypoints[:, 0] = y_max - keypoints[:, 1]-1
+                    new_keypoints[:, 0] = y_max - keypoints[:, 1] - 1
                     new_keypoints[:, 1] = keypoints[:, 0]
                 f[image_fn]["keypoints"][...] = new_keypoints
 
@@ -275,10 +276,12 @@ class Pipeline:
         logging.info(f"Using {camera_mode}")
 
         pixsfm = (
-            self.use_pixsfm and len(self.img_list) <= self.pixsfm_max_imgs and self.n_rotated == 0
+            self.use_pixsfm
+            and len(self.img_list) <= self.pixsfm_max_imgs
+            and (self.n_rotated == 0 or self.args.rotation_wrapper)
         )
 
-        if self.n_rotated != 0 and self.use_pixsfm:
+        if self.n_rotated != 0 and self.use_pixsfm and not self.args.rotation_wrapper:
             logging.info(f"Not using pixsfm because {self.n_rotated} rotated images are detected")
 
         if pixsfm:
@@ -328,7 +331,7 @@ class Pipeline:
             except Exception:
                 logging.warning("Could not reconstruct model with PixSfM.")
                 self.sparse_model = None
-        else: 
+        else:
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
                 image_dir=self.paths.image_dir,
@@ -357,6 +360,6 @@ class Pipeline:
             "create-ensemble": time_function(self.create_ensemble)(),
             "rotate-keypoints": time_function(self.rotate_keypoints)(),
             "sfm": time_function(self.sfm)(),
-            "back-rotate-cameras":time_function(self.back_rotate_cameras)(),
+            "back-rotate-cameras": time_function(self.back_rotate_cameras)(),
             "localize-unreg": time_function(self.localize_unregistered)(),
         }
