@@ -90,7 +90,7 @@ def preprocess_image_dir(
     n_rotated = 0
     n_total = len(image_list)
 
-    if args.rotation_matching:
+    if args.rotation_matching or args.rotation_wrapper:
         import tensorflow as tf
 
         gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -104,7 +104,7 @@ def preprocess_image_dir(
         deep_orientation = dioad.infer.Inference(load_model_path=weights)
 
         for image_fn in tqdm(image_list, desc=f"Rotating {input_dir.name}", ncols=80):
-            img_path = input_dir / "images" / image_fn
+            img_path = output_dir / "images" / image_fn
 
             angle = deep_orientation.predict("vit", str(img_path))
 
