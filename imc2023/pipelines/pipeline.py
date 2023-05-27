@@ -214,16 +214,16 @@ class Pipeline:
                     # rotate keypoints by -90 degrees
                     # ==> (x,y) becomes (y, x_max - x)
                     new_keypoints[:, 0] = keypoints[:, 1]
-                    new_keypoints[:, 1] = x_max - keypoints[:, 0]
+                    new_keypoints[:, 1] = x_max - keypoints[:, 0]-1
                 elif angle == 180:
                     # rotate keypoints by 180 degrees
                     # ==> (x,y) becomes (x_max - x, y_max - y)
-                    new_keypoints[:, 0] = x_max - keypoints[:, 0]
-                    new_keypoints[:, 1] = y_max - keypoints[:, 1]
+                    new_keypoints[:, 0] = x_max - keypoints[:, 0]-1
+                    new_keypoints[:, 1] = y_max - keypoints[:, 1]-1
                 elif angle == 270:
                     # rotate keypoints by +90 degrees
                     # ==> (x,y) becomes (y_max - y, x)
-                    new_keypoints[:, 0] = y_max - keypoints[:, 1]
+                    new_keypoints[:, 0] = y_max - keypoints[:, 1]-1
                     new_keypoints[:, 1] = keypoints[:, 0]
                 f[image_fn]["keypoints"][...] = new_keypoints
 
