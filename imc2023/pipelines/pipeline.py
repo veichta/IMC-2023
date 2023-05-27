@@ -66,6 +66,7 @@ class Pipeline:
         self.args = args
 
         self.sparse_model = None
+        self.rotated_sparse_model = None
 
         self.is_ensemble = type(self.config["features"]) == list
         if self.is_ensemble:
@@ -192,19 +193,18 @@ class Pipeline:
         if not self.use_rotation_wrapper:
             return
         self.log_step("Back-rotate camera poses")
-
         for id, im in self.sparse_model.images.items():
             angle = self.rotation_angles[im.name]
             if angle !=0:
                 # back rotate <Image 'image_id=30, camera_id=30, name="DSC_6633.JPG", triangulated=404/3133'> by 90
-                logging.info(f"back rotate {im} by {angle}")
+                # logging.info(f"back rotate {im} by {angle}")
                 rotmat = rot_mat_z(angle)
-                logging.info(rotmat)
+                # logging.info(rotmat)
                 R = im.rotmat()
                 t = np.array(im.tvec)
                 self.sparse_model.images[id].tvec = rotmat @t
                 self.sparse_model.images[id].qvec = rotmat2qvec(rotmat @ R)
-        self.sparse_model.write(self.paths.sfm_dir)
+        # self.sparse_model.write(self.paths.sfm_dir)
         # swap the two image folders
         image_dir = self.paths.rotated_image_dir
         self.paths.rotated_image_dir = self.paths.image_dir
