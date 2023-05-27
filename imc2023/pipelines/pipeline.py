@@ -17,7 +17,7 @@ from hloc.utils.io import list_h5_names
 from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
-
+from imc2023.utils import rot_mat_z, rotmat2qvec
 
 def time_function(func):
     """Time a function."""
@@ -61,10 +61,12 @@ class Pipeline:
         self.pixsfm_config = args.pixsfm_config
         self.pixsfm_script_path = args.pixsfm_script_path
         self.use_rotation_matching = args.rotation_matching
+        self.use_rotation_wrapper = args.rotation_wrapper
         self.overwrite = args.overwrite
         self.args = args
 
         self.sparse_model = None
+        self.rotated_sparse_model = None
 
         self.is_ensemble = type(self.config["features"]) == list
         if self.is_ensemble:
@@ -86,6 +88,7 @@ class Pipeline:
             "rotate_keypoints": 0,
             "sfm": 0,
             "localize_unregistered": 0,
+            "back-rotate-cameras":0
         }
 
     def log_step(self, title: str) -> None:
@@ -120,7 +123,7 @@ class Pipeline:
             logging.info(f"Pairs already at {self.paths.pairs_path}")
             return
         else:
-            if self.use_rotation_matching:
+            if self.use_rotation_matching or self.use_rotation_wrapper:
                 image_dir = self.paths.rotated_image_dir
             else:
                 image_dir = self.paths.image_dir
@@ -184,6 +187,28 @@ class Pipeline:
             for pair in pairs:
                 p = pair.split("/")
                 f.write(f"{p[0]} {p[1]}\n")
+
+    def back_rotate_cameras(self):
+        """Rotate R and t for each rotated camera. """
+        if not self.use_rotation_wrapper:
+            return
+        self.log_step("Back-rotate camera poses")
+        for id, im in self.sparse_model.images.items():
+            angle = self.rotation_angles[im.name]
+            if angle !=0:
+                # back rotate <Image 'image_id=30, camera_id=30, name="DSC_6633.JPG", triangulated=404/3133'> by 90
+                # logging.info(f"back rotate {im} by {angle}")
+                rotmat = rot_mat_z(angle)
+                # logging.info(rotmat)
+                R = im.rotmat()
+                t = np.array(im.tvec)
+                self.sparse_model.images[id].tvec = rotmat @t
+                self.sparse_model.images[id].qvec = rotmat2qvec(rotmat @ R)
+        # self.sparse_model.write(self.paths.sfm_dir)
+        # swap the two image folders
+        image_dir = self.paths.rotated_image_dir
+        self.paths.rotated_image_dir = self.paths.image_dir
+        self.paths.image_dir = image_dir
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
@@ -284,7 +309,7 @@ class Pipeline:
             except Exception:
                 logging.warning("Could not reconstruct model with PixSfM.")
                 self.sparse_model = None
-        else:
+        else: 
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
                 image_dir=self.paths.image_dir,
@@ -312,5 +337,6 @@ class Pipeline:
             "create-ensemble": time_function(self.create_ensemble)(),
             "rotate-keypoints": time_function(self.rotate_keypoints)(),
             "sfm": time_function(self.sfm)(),
+            "back-rotate-cameras":time_function(self.back_rotate_cameras)(),
             "localize-unreg": time_function(self.localize_unregistered)(),
         }
