@@ -67,15 +67,19 @@ def preprocess_image_dir(
         Tuple[Dict[str, Any], bool]: Dictionary mapping image file names to rotation angles and
             whether all images have the same shape.
     """
-    same_shapes = True
+    same_original_shapes = True
     prev_shape = None
+
+    # log paths to debug
+    logging.debug(f"Rescaling {input_dir / 'images'}")
+    logging.debug(f"Saving to {output_dir / 'images'}")
 
     for image_fn in tqdm(image_list, desc=f"Rescaling {input_dir.name}", ncols=80):
         img_path = input_dir / "images" / image_fn
         image = cv2.imread(str(img_path))
 
         if prev_shape is not None:
-            same_shapes &= prev_shape == image.shape
+            same_original_shapes &= prev_shape == image.shape
 
         prev_shape = image.shape
 
@@ -90,7 +94,14 @@ def preprocess_image_dir(
     n_rotated = 0
     n_total = len(image_list)
 
+    same_rotated_shapes = True
+    prev_shape = None
+
     if args.rotation_matching or args.rotation_wrapper:
+        # log paths to debug
+        logging.debug(f"Rotating {output_dir / 'images'}")
+        logging.debug(f"Saving to {output_dir / 'images_rotated'}")
+
         import tensorflow as tf
 
         gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -111,6 +122,11 @@ def preprocess_image_dir(
             image = cv2.imread(str(img_path))
             image, angle = get_rotated_image(image, angle)
 
+            if prev_shape is not None:
+                same_rotated_shapes &= prev_shape == image.shape
+
+            prev_shape = image.shape
+
             if angle != 0:
                 n_rotated += 1
 
@@ -126,6 +142,8 @@ def preprocess_image_dir(
 
     logging.info(f"Rotated {n_rotated} of {n_total} images.")
 
-    logging.info(f"Images have same shapes: {same_shapes}.")
+    same_shape = same_rotated_shapes if args.rotation_wrapper else same_original_shapes
 
-    return rotation_angles, same_shapes
+    logging.info(f"Images have same shapes: {same_shape}.")
+
+    return rotation_angles, same_shape

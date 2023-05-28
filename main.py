@@ -51,6 +51,7 @@ from imc2023.utils.utils import (
 #     "shared_camera": True,
 #     "overwrite": True,
 #     "kaggle": True,
+#     "skip_scenes": None,
 # }
 
 # args = argparse.Namespace(**args)
@@ -77,6 +78,8 @@ def get_output_dir(args: argparse.Namespace) -> Path:
         output_dir += f"-{args.resize}px"
     if args.shared_camera:
         output_dir += "-sci"
+    if args.rotation_wrapper:
+        output_dir += "-rotwrap"
 
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -146,6 +149,10 @@ def main(args):
             logging.info("=" * 80)
             logging.info(f"{dataset} - {scene}")
             logging.info("=" * 80)
+
+            if args.skip_scenes is not None and scene in args.skip_scenes and args.mode == "train":
+                logging.info(f"Skipping {dataset} - {scene}")
+                continue
 
             start_scene = time.time()
 
@@ -253,6 +260,7 @@ if __name__ == "__main__":
     parser.add_argument("--shared_camera", action="store_true", help="use shared camera intrinsics")
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
     parser.add_argument("--kaggle", action="store_true", help="kaggle mode")
+    parser.add_argument("--skip_scenes", nargs="+", help="scenes to skip")
     args = parser.parse_args()
 
     main(args)
