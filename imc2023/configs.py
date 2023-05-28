@@ -171,8 +171,8 @@ configs = {
         "retrieval": extract_features.confs["netvlad"],
         "n_retrieval": 50,
         "ensemble": {
-            "max_error": 4,
-            "cell_size": 2,
+            "max_error": 2,
+            "cell_size": 1,
             "max_kps": None,
         }
     },

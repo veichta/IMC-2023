@@ -1,10 +1,12 @@
+import os
 import logging
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Dict, List, Optional
 
 import h5py as h5
 import numpy as np
-from hloc.utils.io import find_pair, list_h5_names
+from hloc.utils.io import find_pair, list_h5_names, names_to_pair, get_keypoints, get_matches
+from hloc.match_dense import aggregate_matches, assign_matches
 from tqdm import tqdm
 
 
@@ -163,3 +165,47 @@ def concat_matches(
                 ens_matches_ds[img1][img2].create_dataset(k, data=ensemble_matches[img1][img2][k])
 
     ens_matches_ds.close()
+
+
+def postprocess_matches(
+        conf: Dict,
+        pairs: List[str],
+        match_path: Path,
+        feature_path: Path,
+        max_kps: Optional[int] = None,
+        ):
+    
+    pairs_ = []
+
+    for pair in pairs:
+        pairs_.append(tuple(pair.split("/")))
+
+    with h5.File(match_path, 'a') as mf:
+        for pair in pairs_:
+            key = names_to_pair(pair[0], pair[1])
+            grp = mf[key]
+            matches0, matching_scores0 = get_matches(match_path, pair[0], pair[1])
+            kpts0 = matches0[:, 0]
+            kpts1 = matches0[:, 1]
+
+            pair0kpts = get_keypoints(feature_path, pair[0])
+            pair1kpts = get_keypoints(feature_path, pair[1])
+            
+            grp.create_dataset('keypoints0', data=pair0kpts[kpts0, :])
+            grp.create_dataset('keypoints1', data=pair1kpts[kpts1, :])
+            grp.create_dataset('scores', data=matching_scores0)
+
+            del grp['matches0']
+            del grp['matching_scores0']
+
+    with h5.File(feature_path, 'w') as ff:
+        for key in ff.keys():
+            del ff[key]
+
+    cpdict = aggregate_matches(conf, pairs_, match_path, feature_path, max_kps = max_kps)
+    
+    # Invalidate matches that are far from selected bin by reassignment
+    if max_kps is not None:
+        logging.info(f'Reassign matches with max_error={conf["max_error"]}.')
+        assign_matches(pairs, match_path, cpdict,
+                       max_error=conf['max_error'])

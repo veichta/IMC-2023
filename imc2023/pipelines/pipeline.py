@@ -15,10 +15,8 @@ from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, 
 from hloc.utils.io import list_h5_names
 
 from imc2023.preprocessing import preprocess_image_dir
-from imc2023.utils.concatenate import concat_features, concat_matches
+from imc2023.utils.concatenate import concat_features, concat_matches, postprocess_matches
 from imc2023.utils.utils import DataPaths
-
-from hloc.match_dense import aggregate_matches
 
 
 def time_function(func):
@@ -182,12 +180,13 @@ class Pipeline:
 
         pairs = sorted(list(list_h5_names(self.paths.matches_path)))
 
-        aggregate_matches(self.config["ensemble"], 
-                          pairs, 
-                          self.paths.matches_path, 
-                          feature_path, 
-                          max_kps = self.config["ensemble"]['max_kps'])
-
+        postprocess_matches(self.config["ensemble"], 
+                            pairs, 
+                            self.paths.matches_path, 
+                            feature_path, 
+                            max_kps = self.config["ensemble"]['max_kps']
+                            )
+        
         with open(self.paths.pairs_path, "w") as f:
             for pair in pairs:
                 p = pair.split("/")
