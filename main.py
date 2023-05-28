@@ -36,6 +36,9 @@ from imc2023.utils.utils import (
 #     "pixsfm_config": "low_memory",
 #     "pixsfm_script_path: "/kaggle/working/run_pixsfm.py",
 #     "rotation_matching": False,
+#     "cropping": False,
+#     "max_rel_crop_size": 0.75,
+#     "min_rel_crop_size": 0.2,
 #     "resize": 1600,
 #     "overwrite": False,
 #     "kaggle": True,
@@ -58,6 +61,8 @@ def get_output_dir(args: argparse.Namespace) -> Path:
         output_dir += "-rot"
     if args.pixsfm:
         output_dir += "-pixsfm"
+    if args.cropping:
+        output_dir += "-crop"
     if args.resize is not None:
         output_dir += f"-{args.resize}px"
 
@@ -229,6 +234,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
     parser.add_argument("--rotation_wrapper", action="store_true", help="wrapper implementation of rotation matching")
+    parser.add_argument("--cropping", action="store_true", help="use image cropping")
+    parser.add_argument(
+        "--max_rel_crop_size", type=float, default=0.75, help="EITHER crop must have a smaller relative size"
+    )
+    parser.add_argument(
+        "--min_rel_crop_size", type=float, default=0.2, help="BOTH crops must have a larger relative size"
+    )
     parser.add_argument("--resize", type=int, help="resize images")
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
     parser.add_argument("--kaggle", action="store_true", help="kaggle mode")

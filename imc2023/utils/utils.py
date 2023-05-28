@@ -181,6 +181,13 @@ class DataPaths:
         self.rotated_image_dir = self.scene_dir / "images_rotated"
         self.rotated_features_path = self.scene_dir / "features_rotated.h5"
 
+        # for image cropping
+        self.cropped_image_dir = self.scene_dir / "images_cropped"
+        self.cropped_pairs_path = self.scene_dir / "pairs_cropped.txt"
+        self.cropped_features_path = self.scene_dir / "features_cropped.h5"
+        self.cropped_matches_path = self.scene_dir / "matches_cropped.h5"
+
+        # for pixsfm
         self.cache = output_dir / "cache"
 
         # create directories
@@ -188,4 +195,5 @@ class DataPaths:
         self.image_dir.mkdir(parents=True, exist_ok=True)
         self.sfm_dir.mkdir(parents=True, exist_ok=True)
         self.rotated_image_dir.mkdir(parents=True, exist_ok=True)
+        self.cropped_image_dir.mkdir(parents=True, exist_ok=True)
         self.cache.mkdir(parents=True, exist_ok=True)
