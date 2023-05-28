@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 import cv2
 import h5py
 import numpy as np
+from tqdm import tqdm
 import pycolmap
 from hloc import extract_features, match_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
 from hloc.utils.io import list_h5_names, get_matches, get_keypoints
@@ -208,13 +209,16 @@ class Pipeline:
 
         # iterate through all original pairs and create crops
         original_pairs = list(list_h5_names(self.paths.matches_path))
-        for pair in original_pairs:
+        for pair in tqdm(original_pairs):
             img_1, img_2 = pair.split("/")
 
             # get original keypoints and matches
             kp_1 = get_keypoints(self.paths.features_path, img_1).astype(np.int32)
             kp_2 = get_keypoints(self.paths.features_path, img_2).astype(np.int32)
             matches, scores = get_matches(self.paths.matches_path, img_1, img_2)
+
+            if len(matches) < 100:
+                continue # too few matches
 
             # get top 80% matches
             threshold = np.quantile(scores, 0.2)
@@ -266,8 +270,8 @@ class Pipeline:
         with open(self.paths.cropped_pairs_path, "w") as f:
             for p1, p2 in crop_pairs:
                 f.write(f"{p1} {p2}\n")
-
-        # perform feature extraction and matching on crops
+        
+        logging.info("Performing feature extraction and matching on crops")
         extract_features.main(
             conf=self.config["features"][0] if self.is_ensemble else self.config["features"],
             image_dir=self.paths.cropped_image_dir,
@@ -280,7 +284,7 @@ class Pipeline:
             matches=self.paths.cropped_matches_path,
         )
 
-        # transform keypoints from cropped image spaces to original image spaces
+        logging.info("Transforming keypoints from cropped image spaces to original image spaces")
         with h5py.File(str(self.paths.cropped_features_path), "r+", libver="latest") as f:
             for name in offsets.keys():
                 keypoints = f[name]["keypoints"].__array__()
@@ -288,7 +292,8 @@ class Pipeline:
                 keypoints[:,1] += offsets[name][1]
                 f[name]["keypoints"][...] = keypoints
 
-        # add new keypoints and matches to the original keypoints and matches
+        logging.info("Concatenating features and matches from crops with original features and matches")
+        # THE CONCATENATION IS CURRENTLY WRONG!!!!!!!!!!
         concat_features(self.paths.features_path, self.paths.cropped_features_path, self.paths.features_path)
         concat_matches(self.paths.matches_path, self.paths.cropped_matches_path, self.paths.matches_path)
 
