@@ -254,8 +254,8 @@ class Pipeline:
 
             # define new names for the crops based on the current pair because each 
             # original image will be cropped in a different way for each original match
-            name_1 = f"{img_1[:-4]}_{img_2[:-4]}_1.jpg"
-            name_2 = f"{img_1[:-4]}_{img_2[:-4]}_2.jpg"
+            name_1 = f"{img_1}_{img_2}_1.jpg"
+            name_2 = f"{img_1}_{img_2}_2.jpg"
 
             # save crops
             cv2.imwrite(str(self.paths.cropped_image_dir / name_1), cropped_image_1)
