@@ -72,14 +72,14 @@ def get_output_dir(args: argparse.Namespace) -> Path:
     output_dir = f"{args.output}/{args.config}"
     if args.rotation_matching:
         output_dir += "-rot"
+    if args.rotation_wrapper:
+        output_dir += "-rotwrap"
     if args.pixsfm:
         output_dir += "-pixsfm"
     if args.resize is not None:
         output_dir += f"-{args.resize}px"
     if args.shared_camera:
         output_dir += "-sci"
-    if args.rotation_wrapper:
-        output_dir += "-rotwrap"
 
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)

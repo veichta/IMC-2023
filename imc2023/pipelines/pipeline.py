@@ -216,10 +216,11 @@ class Pipeline:
                 self.sparse_model.images[id].tvec = rotmat @ t
                 self.sparse_model.images[id].qvec = rotmat2qvec(rotmat @ R)
         # self.sparse_model.write(self.paths.sfm_dir)
+
         # swap the two image folders
-        image_dir = self.paths.rotated_image_dir
-        self.paths.rotated_image_dir = self.paths.image_dir
-        self.paths.image_dir = image_dir
+        # image_dir = self.paths.rotated_image_dir
+        # self.paths.rotated_image_dir = self.paths.image_dir
+        # self.paths.image_dir = image_dir
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""

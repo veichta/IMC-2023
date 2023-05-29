@@ -29,6 +29,9 @@ def setup_logger():
     numexpr_logger = logging.getLogger("numexpr")
     numexpr_logger.setLevel(logging.ERROR)
 
+    filelock_logger = logging.getLogger("filelock")
+    filelock_logger.setLevel(logging.ERROR)
+
     warnings.filterwarnings(
         "ignore", category=FutureWarning, module="transformers.models.vit.feature_extraction_vit"
     )
