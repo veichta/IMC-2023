@@ -15,10 +15,10 @@ def setup_logger():
     )
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
-    handler.setLevel(logging.INFO)
+    handler.setLevel(logging.DEBUG)
 
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     logger.addHandler(handler)
     logger.propagate = False
 
@@ -28,6 +28,9 @@ def setup_logger():
 
     numexpr_logger = logging.getLogger("numexpr")
     numexpr_logger.setLevel(logging.ERROR)
+
+    filelock_logger = logging.getLogger("filelock")
+    filelock_logger.setLevel(logging.ERROR)
 
     warnings.filterwarnings(
         "ignore", category=FutureWarning, module="transformers.models.vit.feature_extraction_vit"
