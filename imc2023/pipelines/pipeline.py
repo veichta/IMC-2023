@@ -21,7 +21,6 @@ from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
 
 
-
 def time_function(func):
     """Time a function."""
 
@@ -204,7 +203,13 @@ class Pipeline:
             return
         
         self.log_step("Performing crop matching")
-        crop_matching(self)
+        crop_matching(
+            paths=self.paths,
+            config=self.config,
+            min_rel_crop_size=self.min_rel_crop_size,
+            max_rel_crop_size=self.max_rel_crop_size,
+            is_ensemble=self.is_ensemble,
+        )
 
     def back_rotate_cameras(self):
         """Rotate R and t for each rotated camera."""
