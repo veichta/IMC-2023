@@ -15,9 +15,10 @@ from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, 
 from hloc.utils.io import list_h5_names
 
 from imc2023.preprocessing import preprocess_image_dir
+from imc2023.utils import rot_mat_z, rotmat2qvec
 from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
-from imc2023.utils import rot_mat_z, rotmat2qvec
+
 
 def time_function(func):
     """Time a function."""
@@ -63,6 +64,7 @@ class Pipeline:
         self.use_rotation_matching = args.rotation_matching
         self.use_rotation_wrapper = args.rotation_wrapper
         self.overwrite = args.overwrite
+        self.same_shapes = False
         self.args = args
 
         self.sparse_model = None
@@ -78,6 +80,7 @@ class Pipeline:
             ), "Only two features are supported for ensemble matching."
 
         self.rotation_angles = {}
+        self.n_rotated = 0
 
         self.timing = {
             "preprocess": 0,
@@ -88,7 +91,7 @@ class Pipeline:
             "rotate_keypoints": 0,
             "sfm": 0,
             "localize_unregistered": 0,
-            "back-rotate-cameras":0
+            "back-rotate-cameras": 0,
         }
 
     def log_step(self, title: str) -> None:
@@ -104,7 +107,8 @@ class Pipeline:
     def preprocess(self) -> None:
         """Preprocess the images."""
         self.log_step("Preprocessing")
-        self.rotation_angles = preprocess_image_dir(
+
+        self.rotation_angles, self.same_shapes = preprocess_image_dir(
             input_dir=self.paths.input_dir,
             output_dir=self.paths.scene_dir,
             image_list=self.img_list,
@@ -153,10 +157,11 @@ class Pipeline:
 
     def create_ensemble(self) -> None:
         """Concatenate features and matches."""
-        if not self.is_ensemble:
-            return
-
         self.log_step("Creating ensemble")
+
+        if not self.is_ensemble:
+            logging.info("Not using ensemble matching")
+            return
 
         feature_path = self.paths.features_path
         if self.use_rotation_matching:
@@ -189,33 +194,41 @@ class Pipeline:
                 f.write(f"{p[0]} {p[1]}\n")
 
     def back_rotate_cameras(self):
-        """Rotate R and t for each rotated camera. """
-        if not self.use_rotation_wrapper:
-            return
+        """Rotate R and t for each rotated camera."""
         self.log_step("Back-rotate camera poses")
+        if not self.use_rotation_wrapper:
+            logging.info("Not using rotation wrapper")
+            return
+
+        if self.sparse_model is None:
+            logging.info("No sparse model reconstructed, skipping back-rotation")
+            return
+
         for id, im in self.sparse_model.images.items():
             angle = self.rotation_angles[im.name]
-            if angle !=0:
+            if angle != 0:
                 # back rotate <Image 'image_id=30, camera_id=30, name="DSC_6633.JPG", triangulated=404/3133'> by 90
                 # logging.info(f"back rotate {im} by {angle}")
                 rotmat = rot_mat_z(angle)
                 # logging.info(rotmat)
                 R = im.rotmat()
                 t = np.array(im.tvec)
-                self.sparse_model.images[id].tvec = rotmat @t
+                self.sparse_model.images[id].tvec = rotmat @ t
                 self.sparse_model.images[id].qvec = rotmat2qvec(rotmat @ R)
         # self.sparse_model.write(self.paths.sfm_dir)
+
         # swap the two image folders
-        image_dir = self.paths.rotated_image_dir
-        self.paths.rotated_image_dir = self.paths.image_dir
-        self.paths.image_dir = image_dir
+        # image_dir = self.paths.rotated_image_dir
+        # self.paths.rotated_image_dir = self.paths.image_dir
+        # self.paths.image_dir = image_dir
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
-        if not self.use_rotation_matching:
-            return
-
         self.log_step("Rotating keypoints")
+
+        if not self.use_rotation_matching:
+            logging.info("Not using rotation matching")
+            return
 
         logging.info(f"Using rotated features from {self.paths.rotated_features_path}")
         shutil.copy(self.paths.rotated_features_path, self.paths.features_path)
@@ -226,6 +239,8 @@ class Pipeline:
                 if angle == 0:
                     continue
 
+                self.n_rotated += 1
+
                 keypoints = f[image_fn]["keypoints"].__array__()
                 y_max, x_max = cv2.imread(str(self.paths.rotated_image_dir / image_fn)).shape[:2]
 
@@ -234,16 +249,16 @@ class Pipeline:
                     # rotate keypoints by -90 degrees
                     # ==> (x,y) becomes (y, x_max - x)
                     new_keypoints[:, 0] = keypoints[:, 1]
-                    new_keypoints[:, 1] = x_max - keypoints[:, 0]-1
+                    new_keypoints[:, 1] = x_max - keypoints[:, 0] - 1
                 elif angle == 180:
                     # rotate keypoints by 180 degrees
                     # ==> (x,y) becomes (x_max - x, y_max - y)
-                    new_keypoints[:, 0] = x_max - keypoints[:, 0]-1
-                    new_keypoints[:, 1] = y_max - keypoints[:, 1]-1
+                    new_keypoints[:, 0] = x_max - keypoints[:, 0] - 1
+                    new_keypoints[:, 1] = y_max - keypoints[:, 1] - 1
                 elif angle == 270:
                     # rotate keypoints by +90 degrees
                     # ==> (x,y) becomes (y_max - y, x)
-                    new_keypoints[:, 0] = y_max - keypoints[:, 1]-1
+                    new_keypoints[:, 0] = y_max - keypoints[:, 1] - 1
                     new_keypoints[:, 1] = keypoints[:, 0]
                 f[image_fn]["keypoints"][...] = new_keypoints
 
@@ -259,12 +274,31 @@ class Pipeline:
             except ValueError:
                 self.sparse_model = None
 
-        logging.info(f"Using images from {self.paths.image_dir}")
+        # read images from rotated image dir if rotation wrapper is used
+        image_dir = (
+            self.paths.rotated_image_dir if self.use_rotation_wrapper else self.paths.image_dir
+        )
+
+        camera_mode = pycolmap.CameraMode.AUTO
+        if self.same_shapes and self.args.shared_camera:
+            camera_mode = pycolmap.CameraMode.SINGLE
+
+        pixsfm = (
+            self.use_pixsfm
+            and len(self.img_list) <= self.pixsfm_max_imgs
+            and (self.n_rotated == 0 or self.args.rotation_wrapper)
+        )
+
+        if self.n_rotated != 0 and self.use_pixsfm and not self.args.rotation_wrapper:
+            logging.info(f"Not using pixsfm because {self.n_rotated} rotated images are detected")
+
+        logging.info(f"Using images from {image_dir}")
         logging.info(f"Using pairs from {self.paths.pairs_path}")
         logging.info(f"Using features from {self.paths.features_path}")
         logging.info(f"Using matches from {self.paths.matches_path}")
+        logging.info(f"Using {camera_mode}")
 
-        if self.use_pixsfm and len(self.img_list) <= self.pixsfm_max_imgs:
+        if pixsfm:
             logging.info("Using PixSfM")
 
             if not self.paths.cache.exists():
@@ -277,7 +311,7 @@ class Pipeline:
                     "--sfm_dir",
                     str(self.paths.sfm_dir),
                     "--image_dir",
-                    str(self.paths.image_dir),
+                    str(image_dir),
                     "--pairs_path",
                     str(self.paths.pairs_path),
                     "--features_path",
@@ -288,6 +322,8 @@ class Pipeline:
                     str(self.paths.cache),
                     "--pixsfm_config",
                     self.pixsfm_config,
+                    "--camera_mode",
+                    "auto" if camera_mode == pycolmap.CameraMode.AUTO else "single",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -305,18 +341,22 @@ class Pipeline:
                     try:
                         self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
                     except ValueError:
+                        logging.warning(
+                            f"Could not reconstruct / read model from {self.paths.sfm_dir}."
+                        )
                         self.sparse_model = None
             except Exception:
                 logging.warning("Could not reconstruct model with PixSfM.")
                 self.sparse_model = None
-        else: 
+        else:
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
-                image_dir=self.paths.image_dir,
+                image_dir=image_dir,
                 image_list=self.img_list,
                 pairs=self.paths.pairs_path,
                 features=self.paths.features_path,
                 matches=self.paths.matches_path,
+                camera_mode=camera_mode,
                 verbose=False,
             )
 
@@ -337,6 +377,6 @@ class Pipeline:
             "create-ensemble": time_function(self.create_ensemble)(),
             "rotate-keypoints": time_function(self.rotate_keypoints)(),
             "sfm": time_function(self.sfm)(),
-            "back-rotate-cameras":time_function(self.back_rotate_cameras)(),
+            "back-rotate-cameras": time_function(self.back_rotate_cameras)(),
             "localize-unreg": time_function(self.localize_unregistered)(),
         }

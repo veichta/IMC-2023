@@ -24,24 +24,40 @@ from imc2023.utils.utils import (
     setup_logger,
 )
 
-# os.makedirs("/kaggle/temp", exist_ok=True)
+## Kaggle version
+# import sys
+
+# sys.path.append("/kaggle/input/imc-23-repo/IMC-2023")
+# sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/Hierarchical-Localization")
+# sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/dioad")
+
+# import os
+# import argparse
+
+# from main import main
 
 # args = {
 #     "data": "/kaggle/input/image-matching-challenge-2023",
-#     "config": "DISK+LG",
+#     "config": "SP+LG+sift+NN",
 #     "mode": "train",
 #     "output": "/kaggle/temp",
-#     "pixsfm": False,
+#     "pixsfm": True,
 #     "pixsfm_max_imgs": 9999,
 #     "pixsfm_config": "low_memory",
-#     "pixsfm_script_path: "/kaggle/working/run_pixsfm.py",
-#     "rotation_matching": False,
-#     "resize": 1600,
-#     "overwrite": False,
+#     "pixsfm_script_path": "/kaggle/input/imc-23-repo/IMC-2023/run_pixsfm.py",
+#     "rotation_matching": True,
+#     "rotation_wrapper": False,
+#     "resize": None,
+#     "shared_camera": True,
+#     "overwrite": True,
 #     "kaggle": True,
+#     "skip_scenes": None,
 # }
 
 # args = argparse.Namespace(**args)
+# os.makedirs(args.output, exist_ok=True)
+
+# main(args)
 
 
 def get_output_dir(args: argparse.Namespace) -> Path:
@@ -56,10 +72,14 @@ def get_output_dir(args: argparse.Namespace) -> Path:
     output_dir = f"{args.output}/{args.config}"
     if args.rotation_matching:
         output_dir += "-rot"
+    if args.rotation_wrapper:
+        output_dir += "-rotwrap"
     if args.pixsfm:
         output_dir += "-pixsfm"
     if args.resize is not None:
         output_dir += f"-{args.resize}px"
+    if args.shared_camera:
+        output_dir += "-sci"
 
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -106,7 +126,6 @@ def main(args):
     )
 
     # RUN
-
     metrics = {}
     out_results = {}
 
@@ -130,7 +149,11 @@ def main(args):
             logging.info("=" * 80)
             logging.info(f"{dataset} - {scene}")
             logging.info("=" * 80)
-            
+
+            if args.skip_scenes is not None and scene in args.skip_scenes and args.mode == "train":
+                logging.info(f"Skipping {dataset} - {scene}")
+                continue
+
             start_scene = time.time()
 
             # SETUP PATHS
@@ -228,10 +251,16 @@ if __name__ == "__main__":
         "--pixsfm_script_path", type=str, default="run_pixsfm.py", help="PixSfM script path"
     )
     parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
-    parser.add_argument("--rotation_wrapper", action="store_true", help="wrapper implementation of rotation matching")
+    parser.add_argument(
+        "--rotation_wrapper",
+        action="store_true",
+        help="wrapper implementation of rotation matching",
+    )
     parser.add_argument("--resize", type=int, help="resize images")
+    parser.add_argument("--shared_camera", action="store_true", help="use shared camera intrinsics")
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
     parser.add_argument("--kaggle", action="store_true", help="kaggle mode")
+    parser.add_argument("--skip_scenes", nargs="+", help="scenes to skip")
     args = parser.parse_args()
 
     main(args)

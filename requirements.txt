@@ -10,3 +10,4 @@ matplotlib
 tensorflow
 transformers
 numba
+triton==2.0.0.dev20221202
