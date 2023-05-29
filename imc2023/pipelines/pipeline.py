@@ -10,15 +10,16 @@ from typing import Any, Dict, List
 import cv2
 import h5py
 import numpy as np
-from tqdm import tqdm
 import pycolmap
-from hloc import extract_features, match_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
-from hloc.utils.io import list_h5_names, get_matches, get_keypoints
+from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
+from hloc.utils.io import list_h5_names
 
+from imc2023.cropping import crop_matching
 from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils.concatenate import concat_features, concat_matches
 from imc2023.utils.utils import DataPaths
 from imc2023.utils import rot_mat_z, rotmat2qvec
+
 
 def time_function(func):
     """Time a function."""
@@ -192,110 +193,13 @@ class Pipeline:
                 p = pair.split("/")
                 f.write(f"{p[0]} {p[1]}\n")
     
-    def perform_cropping(self):
+    def match_crops(self):
         """Crop images for each pair and use them to add additional matches."""
         if not self.use_cropping:
             return
         
-        self.log_step("Performing image cropping")
-
-        logging.info("Creating crops for all matches")
-
-        # new list of pairs for the matching on crops
-        crop_pairs = []
-
-        # dictionary of offsets to transform the keypoints from "crop spaces" to the original image spaces
-        offsets = {}
-
-        # iterate through all original pairs and create crops
-        original_pairs = list(list_h5_names(self.paths.matches_path))
-        for pair in tqdm(original_pairs):
-            img_1, img_2 = pair.split("/")
-
-            # get original keypoints and matches
-            kp_1 = get_keypoints(self.paths.features_path, img_1).astype(np.int32)
-            kp_2 = get_keypoints(self.paths.features_path, img_2).astype(np.int32)
-            matches, scores = get_matches(self.paths.matches_path, img_1, img_2)
-
-            if len(matches) < 100:
-                continue # too few matches
-
-            # get top 80% matches
-            threshold = np.quantile(scores, 0.2)
-            mask = scores >= threshold
-            top_matches = matches[mask]
-
-            # compute bounding boxes based on the keypoints of the top 80% matches
-            top_kp_1 = kp_1[top_matches[:,0]]
-            top_kp_2 = kp_2[top_matches[:,1]]
-            original_image_1 = cv2.imread(str(self.paths.image_dir / img_1))
-            original_image_2 = cv2.imread(str(self.paths.image_dir / img_2))
-            cropped_image_1 = original_image_1[
-                top_kp_1[:, 1].min() : top_kp_1[:, 1].max() + 1, 
-                top_kp_1[:, 0].min() : top_kp_1[:, 0].max() + 1, 
-            ]
-            cropped_image_2 = original_image_2[
-                top_kp_2[:, 1].min() : top_kp_2[:, 1].max() + 1, 
-                top_kp_2[:, 0].min() : top_kp_2[:, 0].max() + 1, 
-            ]
-
-            # check if the relative size conditions are fulfilled
-            rel_size_1 = cropped_image_1.size / original_image_1.size
-            rel_size_2 = cropped_image_2.size / original_image_2.size
-
-            if rel_size_1 <= self.min_rel_crop_size or rel_size_2 < self.min_rel_crop_size:
-                # one of the crops or both crops are too small ==> avoid degenerate crops
-                continue 
-
-            if rel_size_1 >= self.max_rel_crop_size and rel_size_2 >= self.max_rel_crop_size:
-                # both crops are almost the same size as the original images
-                # ==> crops are not useful (almost same matches as on the original images)
-                continue
-
-            # define new names for the crops based on the current pair because each 
-            # original image will be cropped in a different way for each original match
-            name_1 = f"{img_1}_{img_2}_1.jpg"
-            name_2 = f"{img_1}_{img_2}_2.jpg"
-
-            # save crops
-            cv2.imwrite(str(self.paths.cropped_image_dir / name_1), cropped_image_1)
-            cv2.imwrite(str(self.paths.cropped_image_dir / name_2), cropped_image_2)
-
-            # create new matching pair and save offsets for image space transformations
-            crop_pairs.append((name_1, name_2))
-            offsets[name_1] = (top_kp_1[:, 0].min(), top_kp_1[:, 1].min())
-            offsets[name_2] = (top_kp_2[:, 0].min(), top_kp_2[:, 1].min())
-        
-        # save new list of crop pairs
-        with open(self.paths.cropped_pairs_path, "w") as f:
-            for p1, p2 in crop_pairs:
-                f.write(f"{p1} {p2}\n")
-        
-        logging.info("Performing feature extraction and matching on crops")
-        extract_features.main(
-            conf=self.config["features"][0] if self.is_ensemble else self.config["features"],
-            image_dir=self.paths.cropped_image_dir,
-            feature_path=self.paths.cropped_features_path,
-        )
-        match_features.main(
-            conf=self.config["matches"][0] if self.is_ensemble else self.config["matches"],
-            pairs=self.paths.cropped_pairs_path,
-            features=self.paths.cropped_features_path,
-            matches=self.paths.cropped_matches_path,
-        )
-
-        logging.info("Transforming keypoints from cropped image spaces to original image spaces")
-        with h5py.File(str(self.paths.cropped_features_path), "r+", libver="latest") as f:
-            for name in offsets.keys():
-                keypoints = f[name]["keypoints"].__array__()
-                keypoints[:,0] += offsets[name][0]
-                keypoints[:,1] += offsets[name][1]
-                f[name]["keypoints"][...] = keypoints
-
-        logging.info("Concatenating features and matches from crops with original features and matches")
-        # THE CONCATENATION IS CURRENTLY WRONG!!!!!!!!!!
-        concat_features(self.paths.features_path, self.paths.cropped_features_path, self.paths.features_path)
-        concat_matches(self.paths.matches_path, self.paths.cropped_matches_path, self.paths.matches_path)
+        self.log_step("Performing crop matching")
+        crop_matching(self)
 
     def back_rotate_cameras(self):
         """Rotate R and t for each rotated camera. """
@@ -444,7 +348,7 @@ class Pipeline:
             "feature-extraction": time_function(self.extract_features)(),
             "feature-matching": time_function(self.match_features)(),
             "create-ensemble": time_function(self.create_ensemble)(),
-            "image-cropping": time_function(self.perform_cropping)(),
+            "crop-matching": time_function(self.match_crops)(),
             "rotate-keypoints": time_function(self.rotate_keypoints)(),
             "sfm": time_function(self.sfm)(),
             "back-rotate-cameras":time_function(self.back_rotate_cameras)(),
