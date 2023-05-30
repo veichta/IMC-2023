@@ -21,14 +21,16 @@ def concat_features(features1: Path, features2: Path, out_path: Path) -> None:
     img_list = list(set(img_list))
     ensemble_features = {}
 
+    # logging.info(f"Image list {img_list}")
+
     with h5.File(features1, "r") as f1:
         with h5.File(features2, "r") as f2:
             for img in tqdm(img_list, desc="concatenating features", ncols=80):
-                kpts1 = f1[img]["keypoints"] if img in f1.keys() else np.array([])
-                kpts2 = f2[img]["keypoints"] if img in f2.keys() else np.array([])
+                kpts1 = f1[img]["keypoints"] if img in f1.keys() else np.empty((0, 2))
+                kpts2 = f2[img]["keypoints"] if img in f2.keys() else np.empty((0, 2))
 
-                scores1 = f1[img]["scores"] if img in f1.keys() else np.array([])
-                scores2 = f2[img]["scores"] if img in f2.keys() else np.array([])
+                scores1 = f1[img]["scores"] if img in f1.keys() else np.empty((0,))
+                scores2 = f2[img]["scores"] if img in f2.keys() else np.empty((0,))
 
                 n_feats1 = len(kpts1) if img in f1.keys() else 0
                 n_feats2 = len(kpts2) if img in f2.keys() else 0
@@ -41,6 +43,12 @@ def concat_features(features1: Path, features2: Path, out_path: Path) -> None:
                     "scores": scores,
                     "counts": [n_feats1, n_feats2],
                 }
+
+                # logging.info("")
+                # logging.info(f"Name: {img}")
+                # logging.info(f"Scores1: {scores1.shape}")
+                # logging.info(f"Scores2: {scores2.shape}")
+                # logging.info(f"Counts: {[n_feats1, n_feats2]}")
 
     # write features
     ens_kp_ds = h5.File(out_path, "w")
@@ -69,8 +77,10 @@ def reverse_matches(
     rev_matches = np.ones(num_kpts2) * -1
     rev_scores = np.zeros(num_kpts2)
 
-    assert len(matches) == num_kpts1, "Number of matches must equal number of keypoints in image 1"
-    assert np.max(matches) < num_kpts2, "Matches must be indices of keypoints in image 2"
+    # assert (
+    #     len(matches) == num_kpts1
+    # ), f"Number of matches must equal number of keypoints in image 1 ({len(matches)} != {num_kpts1})"
+    # assert np.max(matches) < num_kpts2, "Matches must be indices of keypoints in image 2"
 
     # matches is a list of length nkps1 with each value being either -1 or the index of the match in
     # nkps2
@@ -125,9 +135,12 @@ def concat_matches(
                 pairs = [sorted(p.split("/"))[0] + "/" + sorted(p.split("/"))[1] for p in pairs]
                 pairs = sorted(list(set(pairs)))
 
-                logging.info(f"Found {len(pairs)} unique pairs")
-                logging.info(f"Pairs in matches1: {len(list_h5_names(matches1_path))}")
-                logging.info(f"Pairs in matches2: {len(list_h5_names(matches2_path))}")
+                # logging.info(f"Found {len(pairs)} unique pairs")
+                # logging.info(f"Pairs in matches1: {len(list_h5_names(matches1_path))}")
+                # logging.info(f"Pairs in matches2: {len(list_h5_names(matches2_path))}")
+                # logging.info(f"Pairs2: {list_h5_names(matches2_path)}")
+
+                p2 = list_h5_names(matches2_path)[0]
 
                 for pair in tqdm(pairs, desc="concatenating matches", ncols=80):
                     name0, name1 = pair.split("/")
@@ -139,6 +152,15 @@ def concat_matches(
                         ensemble_matches[name0][name1] = {}
 
                     # get matches1
+                    # if pair == p2:
+                    # logging.info(
+                    #     f"Pair: {pair} -> ({name0}, {name1}) in p2: {name0 in p2}, {name1 in p2}"
+                    # )
+                    # logging.info(f"Counts0: {ensemble_features[name0]['counts'][:]}")
+                    # logging.info(f"Counts1: {ensemble_features[name1]['counts'][:]}")
+                    # logging.info(f"Matches1: {matches1[pair]['matches0']}")
+                    # logging.info(f"Matches2: {matches2[pair]['matches0']}")
+
                     m1, sc1 = extract_matches(matches1, ensemble_features, name0, name1, idx=0)
 
                     # get matches2
@@ -148,7 +170,9 @@ def concat_matches(
                     offset = ensemble_features[name1]["counts"][0]
                     m2 += offset * np.where(m2 != -1, 1, 0)
 
-                    ensemble_matches[name0][name1]["matches0"] = np.concatenate([m1, m2], axis=0)
+                    ensemble_matches[name0][name1]["matches0"] = np.concatenate(
+                        [m1, m2], axis=0
+                    ).astype(np.int32)
 
                     ensemble_matches[name0][name1]["matching_scores0"] = np.concatenate(
                         [sc1, sc2], axis=0

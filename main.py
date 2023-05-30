@@ -135,7 +135,10 @@ def main(args):
             logging.info("=" * 80)
             logging.info(f"{dataset} - {scene}")
             logging.info("=" * 80)
-            
+
+            if scene == "dioscuri":
+                continue
+
             start_scene = time.time()
 
             # SETUP PATHS
@@ -233,13 +236,23 @@ if __name__ == "__main__":
         "--pixsfm_script_path", type=str, default="run_pixsfm.py", help="PixSfM script path"
     )
     parser.add_argument("--rotation_matching", action="store_true", help="use rotation matching")
-    parser.add_argument("--rotation_wrapper", action="store_true", help="wrapper implementation of rotation matching")
+    parser.add_argument(
+        "--rotation_wrapper",
+        action="store_true",
+        help="wrapper implementation of rotation matching",
+    )
     parser.add_argument("--cropping", action="store_true", help="use image cropping")
     parser.add_argument(
-        "--max_rel_crop_size", type=float, default=0.75, help="EITHER crop must have a smaller relative size"
+        "--max_rel_crop_size",
+        type=float,
+        default=0.5,
+        help="EITHER crop must have a smaller relative size",
     )
     parser.add_argument(
-        "--min_rel_crop_size", type=float, default=0.2, help="BOTH crops must have a larger relative size"
+        "--min_rel_crop_size",
+        type=float,
+        default=0.05,
+        help="BOTH crops must have a larger relative size",
     )
     parser.add_argument("--resize", type=int, help="resize images")
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")

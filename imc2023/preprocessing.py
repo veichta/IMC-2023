@@ -67,6 +67,10 @@ def preprocess_image_dir(
         dict[str, Any]: Dictionary containing the rotation angles for each image.
     """
     for image_fn in tqdm(image_list, desc=f"Rescaling {input_dir.name}", ncols=80):
+        out_path = output_dir / "images" / image_fn
+        if out_path.exists() and not args.overwrite:
+            continue
+
         img_path = input_dir / "images" / image_fn
         image = cv2.imread(str(img_path))
 
@@ -74,7 +78,7 @@ def preprocess_image_dir(
         if args.resize is not None:
             image = resize_image(image, args.resize)
 
-        cv2.imwrite(str(output_dir / "images" / image_fn), image)
+        cv2.imwrite(str(out_path), image)
 
     # rotate image
     rotation_angles = {}
@@ -96,6 +100,9 @@ def preprocess_image_dir(
 
         for image_fn in tqdm(image_list, desc=f"Rotating {input_dir.name}", ncols=80):
             img_path = output_dir / "images" / image_fn
+            out_path = output_dir / "images_rotated" / image_fn
+            if out_path.exists() and not args.overwrite:
+                continue
 
             angle = deep_orientation.predict("vit", str(img_path))
 
@@ -105,7 +112,7 @@ def preprocess_image_dir(
             if angle != 0:
                 n_rotated += 1
 
-            cv2.imwrite(str(output_dir / "images_rotated" / image_fn), image)
+            cv2.imwrite(str(out_path), image)
 
             rotation_angles[image_fn] = angle
 
