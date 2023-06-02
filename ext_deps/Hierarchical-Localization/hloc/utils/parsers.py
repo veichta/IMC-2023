@@ -37,7 +37,7 @@ def parse_image_lists(paths, with_intrinsics=False):
     return images
 
 
-def parse_retrieval(path):
+def parse_retrieval(path, bidirectional=False):
     retrieval = defaultdict(list)
     with open(path, 'r') as f:
         for p in f.read().rstrip('\n').split('\n'):
@@ -45,6 +45,8 @@ def parse_retrieval(path):
                 continue
             q, r = p.split()
             retrieval[q].append(r)
+            if bidirectional:
+                retrieval[r].append(q)
     return dict(retrieval)
 
 
