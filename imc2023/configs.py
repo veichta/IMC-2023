@@ -184,4 +184,109 @@ configs = {
         "retrieval": extract_features.confs["netvlad"],
         "n_retrieval": 30,
     },
+    "DISK+SPv2+LG": {
+        "features": [
+            extract_features.confs["disk"],
+            {
+                "output": "feats-superpointv2-n4096-r1600",
+                "model": {
+                    "name": "superpoint_v2",
+                    "max_num_keypoints": 4096,
+                    "weights": "sp_caps",
+                },
+                "preprocessing": {
+                    # "grayscale": True,
+                    "resize_max": 1600,
+                    # "resize_force": True,
+                },
+            },
+        ],
+        "matches": [
+            {
+                "output": "matches-disk-lightglue",
+                "model": {
+                    "name": "lightglue",
+                    "weights": "disk_lightglue_legacy",
+                    "input_dim": 128,
+                    "flash": False,
+                    "filter_threshold": 0.1,
+                    "rotary": {
+                        "axial": True,
+                    },
+                },
+            },
+            {
+                "output": "matches-sp2-lightglue",
+                "model": {
+                    "name": "lightglue",
+                    "weights": "superpointv2_lightglue",
+                    "input_dim": 128,
+                    "flash": False,
+                    "filter_threshold": 0.1,
+                },
+            },
+        ],
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 30,
+    },
+    "SPv2+LG+sift+NN": {
+        "features": [
+            {
+                "output": "feats-superpointv2-n4096-r1600",
+                "model": {
+                    "name": "superpoint_v2",
+                    "max_num_keypoints": 4096,
+                    "weights": "sp_caps",
+                },
+                "preprocessing": {
+                    # "grayscale": True,
+                    "resize_max": 1600,
+                    "resize_force": True,
+                },
+            },
+            extract_features.confs["sift"],
+        ],
+        "matches": [
+            {
+                "output": "matches-sp2-lightglue",
+                "model": {
+                    "name": "lightglue",
+                    "weights": "superpointv2_lightglue",
+                    "input_dim": 128,
+                    "flash": False,
+                    "filter_threshold": 0.1,
+                },
+            },
+            match_features.confs["NN-ratio"],
+        ],
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
+    "SPv2+LG": {
+        "features": {
+            "output": "feats-superpointv2-n4096-r1600",
+            "model": {
+                "name": "superpoint_v2",
+                "max_num_keypoints": 4096,
+                "weights": "sp_caps",
+            },
+            "preprocessing": {
+                # "grayscale": True,
+                "resize_max": 1600,
+                "resize_force": True,
+            },
+        },
+        "matches": {
+            "output": "matches-sp2-lightglue",
+            "model": {
+                "name": "lightglue",
+                "weights": "superpointv2_lightglue",
+                "input_dim": 128,
+                "flash": False,
+                "filter_threshold": 0.1,
+            },
+        },
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
 }

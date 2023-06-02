@@ -32,6 +32,12 @@ def setup_logger():
     filelock_logger = logging.getLogger("filelock")
     filelock_logger.setLevel(logging.ERROR)
 
+    urllib3_logger = logging.getLogger("urllib3")
+    urllib3_logger.setLevel(logging.ERROR)
+
+    h5py_logger = logging.getLogger("h5py")
+    h5py_logger.setLevel(logging.ERROR)
+
     warnings.filterwarnings(
         "ignore", category=FutureWarning, module="transformers.models.vit.feature_extraction_vit"
     )
