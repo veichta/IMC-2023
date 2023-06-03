@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Tuple
 import cv2
 import dioad.infer
 import numpy as np
+import os
 from tqdm import tqdm
 
 
@@ -67,14 +68,14 @@ def preprocess_image_dir(
         dict[str, Any]: Dictionary containing the rotation angles for each image.
     """
     for image_fn in tqdm(image_list, desc=f"Rescaling {input_dir.name}", ncols=80):
-        img_path = input_dir / "images" / image_fn
-        image = cv2.imread(str(img_path))
+        img_path = os.path.join(input_dir,"images",image_fn)
+        image = cv2.imread(img_path)
 
         # resize image
         if args.resize is not None:
             image = resize_image(image, args.resize)
 
-        cv2.imwrite(str(output_dir / "images" / image_fn), image)
+        cv2.imwrite(os.path.join(output_dir,"images",image_fn), image)
 
     # rotate image
     rotation_angles = {}
@@ -95,17 +96,17 @@ def preprocess_image_dir(
         deep_orientation = dioad.infer.Inference(load_model_path=weights)
 
         for image_fn in tqdm(image_list, desc=f"Rotating {input_dir.name}", ncols=80):
-            img_path = output_dir / "images" / image_fn
+            img_path = os.path.join(output_dir, "images", image_fn)
 
-            angle = deep_orientation.predict("vit", str(img_path))
+            angle = deep_orientation.predict("vit", img_path)
 
-            image = cv2.imread(str(img_path))
+            image = cv2.imread(img_path)
             image, angle = get_rotated_image(image, angle)
 
             if angle != 0:
                 n_rotated += 1
 
-            cv2.imwrite(str(output_dir / "images_rotated" / image_fn), image)
+            cv2.imwrite(os.path.join(output_dir, "images_rotated", image_fn), image)
 
             rotation_angles[image_fn] = angle
 
