@@ -314,4 +314,58 @@ configs = {
         "retrieval": extract_features.confs["netvlad"],
         "n_retrieval": 50,
     },
+    "aliked+SPv2+LG": {
+        "features": [
+            {
+                "output": "feats-superpointv2-n4096-r1600",
+                "model": {
+                    "name": "superpoint_v2",
+                    "max_num_keypoints": 4096,
+                    "weights": "sp_caps",
+                },
+                "preprocessing": {
+                    "resize_max": 1600,
+                    "resize_force": True,
+                },
+            },
+            {
+                "output": "feats-alikedn16",
+                "model": {
+                    "name": "aliked",
+                    'model_name': 'aliked-n16',  # 'aliked-t16', 'aliked-n16', 'aliked-n16rot', 'aliked-n32'
+                    'max_num_keypoints': 4096,
+                    'detection_threshold': 0.0,
+                    'force_num_keypoints': False,
+                },
+                "preprocessing": {
+                    "resize_max": 1600,
+                    # "resize_force": True,
+                },
+            },
+        ],
+        "matches": [
+            {
+                "output": "matches-sp2-lightglue",
+                "model": {
+                    "name": "lightglue",
+                    "weights": "superpointv2_lightglue",
+                    "input_dim": 128,
+                    "flash": False,
+                    "filter_threshold": 0.1,
+                },
+            },
+            {
+                "output": "matches-aliked-lightglue",
+                "model": {
+                    "name": "lightglue",
+                    "weights": "aliked_lightglue",
+                    "input_dim": 128,
+                    "flash": False,
+                    "filter_threshold": 0.1,
+                },
+            },
+        ],
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
 }
