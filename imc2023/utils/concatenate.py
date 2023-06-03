@@ -24,11 +24,11 @@ def concat_features(features1: Path, features2: Path, out_path: Path) -> None:
     with h5.File(features1, "r") as f1:
         with h5.File(features2, "r") as f2:
             for img in tqdm(img_list, desc="concatenating features", ncols=80):
-                kpts1 = f1[img]["keypoints"] if img in f1.keys() else np.array([])
-                kpts2 = f2[img]["keypoints"] if img in f2.keys() else np.array([])
+                kpts1 = f1[img]["keypoints"] if img in f1.keys() else np.empty((0, 2))
+                kpts2 = f2[img]["keypoints"] if img in f2.keys() else np.empty((0, 2))
 
-                scores1 = f1[img]["scores"] if img in f1.keys() else np.array([])
-                scores2 = f2[img]["scores"] if img in f2.keys() else np.array([])
+                scores1 = f1[img]["scores"] if img in f1.keys() else np.empty((0,))
+                scores2 = f2[img]["scores"] if img in f2.keys() else np.empty((0,))
 
                 n_feats1 = len(kpts1) if img in f1.keys() else 0
                 n_feats2 = len(kpts2) if img in f2.keys() else 0
@@ -148,7 +148,7 @@ def concat_matches(
                     offset = ensemble_features[name1]["counts"][0]
                     m2 += offset * np.where(m2 != -1, 1, 0)
 
-                    ensemble_matches[name0][name1]["matches0"] = np.concatenate([m1, m2], axis=0)
+                    ensemble_matches[name0][name1]["matches0"] = np.concatenate([m1, m2], axis=0).astype(np.int32)
 
                     ensemble_matches[name0][name1]["matching_scores0"] = np.concatenate(
                         [sc1, sc2], axis=0
