@@ -138,14 +138,14 @@ def crop_matching(
         with h5py.File(str(paths.cropped_matches_path), "r", libver="latest") as f:
             new_matches = f[img_1][img_2]["matches0"].__array__()
             new_matches += offset * np.where(new_matches != -1, 1, 0)
-            matches_dict[img_1][img_2]["matching_scores0"] = np.concatenate(
-                [matches_dict[img_1][img_2]["matching_scores0"], new_scores], axis=0
-            )
-
-            new_scores = f[img_1][img_2]["matching_scores0"].__array__()
             matches_dict[img_1][img_2]["matches0"] = np.concatenate(
                 [matches_dict[img_1][img_2]["matches0"], new_matches], axis=0
             ).astype(np.int32)
+
+            new_scores = f[img_1][img_2]["matching_scores0"].__array__()
+            matches_dict[img_1][img_2]["matching_scores0"] = np.concatenate(
+                [matches_dict[img_1][img_2]["matching_scores0"], new_scores], axis=0
+            )
 
         # add new keypoints to dictionary
         keypoints_dict[img_1] = np.concatenate(
