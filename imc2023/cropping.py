@@ -1,4 +1,3 @@
-import logging
 import cv2
 import os
 import h5py
@@ -11,15 +10,14 @@ from hloc import extract_features, match_features
 from hloc.utils.io import list_h5_names, get_matches, get_keypoints
 
 from imc2023.utils.utils import DataPaths
-from imc2023.utils.concatenate import concat_features, concat_matches
 
 
 def crop_matching(
-    paths: DataPaths, 
-    config: Dict[str, Any], 
+    paths: DataPaths,
+    config: Dict[str, Any],
     min_rel_crop_size: float,
     max_rel_crop_size: float,
-    is_ensemble: bool, 
+    is_ensemble: bool,
 ) -> None:
     """Perform feature matching on cropped images and add new matches to the current ones.
 
@@ -29,7 +27,25 @@ def crop_matching(
         min_rel_crop_size (float): BOTH crops must have a larger relative size
         max_rel_crop_size (float): EITHER crop must have a smaller relative size
         is_ensemble (bool): Whether the current run is using an ensemble.
-    """    
+    """
+    # dictionaries that will contain all final kepoints and matches in the end
+    keypoints_dict: Dict[str, np.ndarray] = {}  # only storing keypoints
+    matches_dict: Dict[str, Dict[str, Dict[str, np.ndarray]]] = {}  # storing matches and scores
+
+    # initialize keypoints dictionary with original keypoints
+    with h5py.File(str(paths.features_path), "r", libver="latest") as f:
+        for img in f.keys():
+            keypoints_dict[img] = get_keypoints(paths.features_path, img)
+
+    # initialize matches dictionary with original matches
+    with h5py.File(str(paths.matches_path), "r", libver="latest") as f:
+        for img_1 in f.keys():
+            matches_dict[img_1] = {}
+            for img_2 in f[img_1].keys():
+                matches_dict[img_1][img_2] = {}
+                matches_dict[img_1][img_2]["matches0"] = f[img_1][img_2]["matches0"].__array__()
+                matches_dict[img_1][img_2]["matching_scores0"] = f[img_1][img_2]["matching_scores0"].__array__()
+
     # iterate through all original pairs and create crops
     original_pairs = list(list_h5_names(paths.matches_path))
     for pair in tqdm(original_pairs, desc="Processing pairs...", ncols=80):
@@ -44,7 +60,7 @@ def crop_matching(
         matches, scores = get_matches(paths.matches_path, img_1, img_2)
 
         if len(matches) < 100:
-            continue # too few matches
+            continue  # too few matches
 
         # get top 80% matches
         threshold = np.quantile(scores, 0.2)
@@ -52,17 +68,17 @@ def crop_matching(
         top_matches = matches[mask]
 
         # compute bounding boxes based on the keypoints of the top 80% matches
-        top_kp_1 = kp_1[top_matches[:,0]]
-        top_kp_2 = kp_2[top_matches[:,1]]
+        top_kp_1 = kp_1[top_matches[:, 0]]
+        top_kp_2 = kp_2[top_matches[:, 1]]
         original_image_1 = cv2.imread(str(paths.image_dir / img_1))
         original_image_2 = cv2.imread(str(paths.image_dir / img_2))
         cropped_image_1 = original_image_1[
-            top_kp_1[:, 1].min() : top_kp_1[:, 1].max() + 1, 
-            top_kp_1[:, 0].min() : top_kp_1[:, 0].max() + 1, 
+            top_kp_1[:, 1].min() : top_kp_1[:, 1].max() + 1,
+            top_kp_1[:, 0].min() : top_kp_1[:, 0].max() + 1,
         ]
         cropped_image_2 = original_image_2[
-            top_kp_2[:, 1].min() : top_kp_2[:, 1].max() + 1, 
-            top_kp_2[:, 0].min() : top_kp_2[:, 0].max() + 1, 
+            top_kp_2[:, 1].min() : top_kp_2[:, 1].max() + 1,
+            top_kp_2[:, 0].min() : top_kp_2[:, 0].max() + 1,
         ]
 
         # check if the relative size conditions are fulfilled
@@ -71,13 +87,13 @@ def crop_matching(
 
         if rel_size_1 <= min_rel_crop_size or rel_size_2 < min_rel_crop_size:
             # one of the crops or both crops are too small ==> avoid degenerate crops
-            continue 
+            continue
 
         if rel_size_1 >= max_rel_crop_size and rel_size_2 >= max_rel_crop_size:
             # both crops are almost the same size as the original images
             # ==> crops are not useful (almost same matches as on the original images)
             continue
-        
+
         # delete temporary directory with intermediate files from previous matching
         if os.path.exists(paths.cropping_dir):
             shutil.rmtree(paths.cropping_dir)
@@ -113,10 +129,51 @@ def crop_matching(
         with h5py.File(str(paths.cropped_features_path), "r+", libver="latest") as f:
             for name in [img_1, img_2]:
                 keypoints = f[name]["keypoints"].__array__()
-                keypoints[:,0] += offsets[name][0]
-                keypoints[:,1] += offsets[name][1]
+                keypoints[:, 0] += offsets[name][0]
+                keypoints[:, 1] += offsets[name][1]
                 f[name]["keypoints"][...] = keypoints
 
-        # concatenate features and matches from crops with original features and matches
-        concat_features(paths.features_path, paths.cropped_features_path, paths.features_path)
-        concat_matches(paths.matches_path, paths.cropped_matches_path, paths.features_path, paths.matches_path)
+        # add new matches to dictionary
+        offset = keypoints_dict[img_2].shape[0]  # OLD number of keypoints in SECOND image!
+        with h5py.File(str(paths.cropped_matches_path), "r", libver="latest") as f:
+            new_matches = f[img_1][img_2]["matches0"].__array__()
+            new_matches += offset * np.where(new_matches != -1, 1, 0)
+            matches_dict[img_1][img_2]["matching_scores0"] = np.concatenate(
+                [matches_dict[img_1][img_2]["matching_scores0"], new_scores], axis=0
+            )
+
+            new_scores = f[img_1][img_2]["matching_scores0"].__array__()
+            matches_dict[img_1][img_2]["matches0"] = np.concatenate(
+                [matches_dict[img_1][img_2]["matches0"], new_matches], axis=0
+            ).astype(np.int32)
+
+        # add new keypoints to dictionary
+        keypoints_dict[img_1] = np.concatenate(
+            [keypoints_dict[img_1], get_keypoints(paths.cropped_features_path, img_1)],
+            axis=0,
+        )
+        keypoints_dict[img_2] = np.concatenate(
+            [keypoints_dict[img_2], get_keypoints(paths.cropped_features_path, img_2)],
+            axis=0,
+        )
+
+    # save final keypoints
+    kp_ds = h5py.File(paths.features_path, "w")
+    for img in keypoints_dict:
+        kp_ds.create_group(img)
+        kp_ds[img].create_dataset("keypoints", data=keypoints_dict[img])
+    kp_ds.close()
+
+    # save final matches
+    matches_ds = h5py.File(paths.matches_path, "w")
+    for img1 in matches_dict:
+        matches_ds.create_group(img1)
+        for img2 in matches_dict[img1].keys():
+            matches_ds[img1].create_group(img2)
+            matches_ds[img1][img2].create_dataset(
+                "matches0", data=matches_dict[img1][img2]["matches0"]
+            )
+            matches_ds[img1][img2].create_dataset(
+                "matching_scores0", data=matches_dict[img1][img2]["matching_scores0"]
+            )
+    matches_ds.close()
