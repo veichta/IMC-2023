@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+from hloc import extract_features
 
 from imc2023.configs import configs
 from imc2023.utils.eval import eval
@@ -38,7 +39,9 @@ from imc2023.utils.utils import (
 
 # args = {
 #     "data": "/kaggle/input/image-matching-challenge-2023",
-#     "config": "SP+LG+sift+NN",
+#     "configs": ["SP+LG"],
+#     "retrieval": "netvlad",
+#     "n_retrieval": 50,
 #     "mode": "train",
 #     "output": "/kaggle/temp",
 #     "pixsfm": True,
@@ -69,7 +72,8 @@ def get_output_dir(args: argparse.Namespace) -> Path:
     Returns:
         Path: Output directory.
     """
-    output_dir = f"{args.output}/{args.config}"
+    name = "+".join(sorted(list(args.configs)))
+    output_dir = f"{args.output}/{name}"
     if args.rotation_matching:
         output_dir += "-rot"
     if args.rotation_wrapper:
@@ -114,7 +118,15 @@ def main(args):
     submission_csv_path = Path(f"{output_dir}/submission.csv")
 
     # CONFIG
-    config = configs[args.config]
+    assert len(args.configs) > 0, "No configs specified"
+    confs = [configs[c] for c in args.configs]
+
+    config = {
+        "features": [c["features"] for c in confs],
+        "matches": [c["matches"] for c in confs],
+        "retrieval": extract_features.confs[args.retrieval],
+        "n_retrieval": args.n_retrieval,
+    }
     with open(str(output_dir / "config.json"), "w") as jf:
         json.dump(config, jf, indent=4)
 
@@ -236,8 +248,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=str, required=True, help="imc dataset")
     parser.add_argument(
-        "--config", type=str, required=True, choices=configs.keys(), help="config name"
+        "--configs", type=str, required=True, nargs="+", choices=configs.keys(), help="configs"
     )
+    parser.add_argument("--retrieval", type=str, required=True, choices=["netvlad", "cosplace"])
+    parser.add_argument("--n_retrieval", type=int, default=50, help="number of retrieval images")
     parser.add_argument(
         "--mode", type=str, required=True, choices=["train", "test"], help="train or test"
     )

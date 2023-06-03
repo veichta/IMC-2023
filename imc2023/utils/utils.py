@@ -180,6 +180,11 @@ class DataPaths:
         self.scene_dir = output_dir / dataset / scene
         self.image_dir = self.scene_dir / "images"
 
+        # self.reference_model = self.input_dir / "sfm"
+        # if not self.reference_model.exists():
+        #     self.reference_model = None
+        self.reference_model = None
+
         self.sfm_dir = self.scene_dir / "sparse"
         self.pairs_path = self.scene_dir / "pairs.txt"
         self.features_retrieval = self.scene_dir / "features_retrieval.h5"
