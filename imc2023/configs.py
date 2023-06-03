@@ -195,9 +195,8 @@ configs = {
                     "weights": "sp_caps",
                 },
                 "preprocessing": {
-                    # "grayscale": True,
                     "resize_max": 1600,
-                    # "resize_force": True,
+                    "resize_force": True,
                 },
             },
         ],
@@ -239,7 +238,6 @@ configs = {
                     "weights": "sp_caps",
                 },
                 "preprocessing": {
-                    # "grayscale": True,
                     "resize_max": 1600,
                     "resize_force": True,
                 },
@@ -271,7 +269,6 @@ configs = {
                 "weights": "sp_caps",
             },
             "preprocessing": {
-                # "grayscale": True,
                 "resize_max": 1600,
                 "resize_force": True,
             },
@@ -281,6 +278,34 @@ configs = {
             "model": {
                 "name": "lightglue",
                 "weights": "superpointv2_lightglue",
+                "input_dim": 128,
+                "flash": False,
+                "filter_threshold": 0.1,
+            },
+        },
+        "retrieval": extract_features.confs["netvlad"],
+        "n_retrieval": 50,
+    },
+    "alikedn16": {
+        "features": {
+            "output": "feats-alikedn16",
+            "model": {
+                "name": "aliked",
+                'model_name': 'aliked-n16',  # 'aliked-t16', 'aliked-n16', 'aliked-n16rot', 'aliked-n32'
+                'max_num_keypoints': 4096,
+                'detection_threshold': 0.0,
+                'force_num_keypoints': False,
+            },
+            "preprocessing": {
+                "resize_max": 1600,
+                # "resize_force": True,
+            },
+        },
+        "matches": {
+            "output": "matches-aliked-lightglue",
+            "model": {
+                "name": "lightglue",
+                "weights": "aliked_lightglue",
                 "input_dim": 128,
                 "flash": False,
                 "filter_threshold": 0.1,
