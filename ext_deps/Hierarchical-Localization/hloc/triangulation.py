@@ -136,6 +136,7 @@ def geometric_verification(
     matched = set()
     for name0 in tqdm(pairs):
         id0 = image_ids[name0]
+        # id0 = np.where(np.array([im.name for im in reference.images.values()]) == name0)[0][0]
         image0 = reference.images[id0]
         cam0 = reference.cameras[image0.camera_id]
         kps0, noise0 = get_keypoints(features_path, name0, return_uncertainty=True)
@@ -147,6 +148,12 @@ def geometric_verification(
 
         for name1 in pairs[name0]:
             id1 = image_ids[name1]
+
+            # get id of name1
+            # id1 = np.where(np.array([im.name for im in reference.images.values()]) == name1)[0][0]
+            # print(f"names: {name0} -> {name1}")
+            # print(f"ids:   {id0} -> {id1} ({id1})")
+
             image1 = reference.images[id1]
             cam1 = reference.cameras[image1.camera_id]
             kps1, noise1 = get_keypoints(features_path, name1, return_uncertainty=True)

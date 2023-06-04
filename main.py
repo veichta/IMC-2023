@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import pickle
+import shutil
 import time
 from pathlib import Path
 
@@ -219,6 +220,10 @@ def main(args):
                 pickle.dump(metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
             with open(results_path, "wb") as handle:
                 pickle.dump(out_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+            # delete scene dir
+            if args.mode == "test":
+                shutil.rmtree(paths.scene_dir)
 
     create_submission(out_results, data_dict, submission_csv_path)
     create_submission(out_results, data_dict, "submission.csv")
