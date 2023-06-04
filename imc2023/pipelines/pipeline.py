@@ -378,7 +378,7 @@ class Pipeline:
                 camera_mode=camera_mode,
                 verbose=False,
                 reference_model=self.paths.reference_model,
-                mapper_options=mapper_options,
+                mapper_options=mapper_options.todict(),
             )
 
         if self.sparse_model is not None:
