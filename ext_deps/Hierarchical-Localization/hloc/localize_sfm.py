@@ -138,7 +138,7 @@ def main(reference_sfm: Union[Path, pycolmap.Reconstruction],
     assert features.exists(), features
     assert matches.exists(), matches
 
-    queries = parse_image_lists(queries, with_intrinsics=True)
+    # queries = parse_image_lists(queries, with_intrinsics=True)
     retrieval_dict = parse_retrieval(retrieval)
 
     logger.info('Reading the 3D model...')
