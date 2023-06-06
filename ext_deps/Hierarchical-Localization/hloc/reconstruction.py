@@ -98,10 +98,6 @@ def run_reconstruction(
     return reconstructions[largest_index]
 
 
-def img_ids_from_reconstruction(reconstruction: pycolmap.Reconstruction) -> Dict[str, int]:
-    return {img.name: img.image_id for img in reconstruction.images.values()}
-
-
 def main(
     sfm_dir: Path,
     image_dir: Path,
@@ -134,9 +130,11 @@ def main(
     if not skip_geometric_verification:
         if reference_model is not None:
             reference = pycolmap.Reconstruction(reference_model)
-            ref_img_ids = img_ids_from_reconstruction(reference)
-            print(ref_img_ids)
-            geometric_verification(ref_img_ids, reference, database, features, pairs, matches)
+            ref_img_ids = {img.name: img.image_id for img in reference.images.values()}
+            # print(ref_img_ids)
+            geometric_verification(
+                image_ids, reference, database, features, pairs, matches, max_error=6
+            )
         else:
             estimation_and_geometric_verification(database, pairs, verbose)
 

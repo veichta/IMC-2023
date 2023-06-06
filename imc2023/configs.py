@@ -22,8 +22,6 @@ configs = {
             "max_error": 1,  # max error for assigned keypoints (in px)
             "cell_size": 1,  # size of quantization patch (max 1 kp/patch)
         },
-        "retrieval": extract_features.confs["netvlad"],
-        "n_retrieval": 20,
     },
     "SP+SG": {
         "features": extract_features.confs["superpoint_max"],
@@ -42,8 +40,6 @@ configs = {
                 "filter_threshold": 0.1,
             },
         },
-        "retrieval": extract_features.confs["netvlad"],
-        "n_retrieval": 50,
     },
     "DISK": {
         "features": extract_features.confs["disk"],
@@ -60,8 +56,6 @@ configs = {
                 },
             },
         },
-        "retrieval": extract_features.confs["netvlad"],
-        "n_retrieval": 50,
     },
     "SP": {
         "features": {
@@ -86,8 +80,6 @@ configs = {
                 "filter_threshold": 0.1,
             },
         },
-        "retrieval": extract_features.confs["netvlad"],
-        "n_retrieval": 50,
     },
     "SPv2": {
         "features": {
@@ -114,8 +106,6 @@ configs = {
                 "filter_threshold": 0.1,
             },
         },
-        "retrieval": extract_features.confs["netvlad"],
-        "n_retrieval": 50,
     },
     "ALIKED": {
         "features": {
@@ -142,7 +132,31 @@ configs = {
                 "filter_threshold": 0.1,
             },
         },
-        "retrieval": extract_features.confs["netvlad"],
-        "n_retrieval": 50,
+    },
+    "SPv2+strict": {
+        "features": {
+            "output": "feats-superpointv2-n4096-r1600",
+            "model": {
+                "name": "superpoint_v2",
+                "max_num_keypoints": 4096,
+                "nms_radius": 8,
+                "detection_threshold": 0.000,
+                "weights": "sp_caps",
+            },
+            "preprocessing": {
+                "resize_max": 1600,
+                "resize_force": True,
+            },
+        },
+        "matches": {
+            "output": "matches-sp2-lightglue",
+            "model": {
+                "name": "lightglue",
+                "weights": "superpointv2_lightglue",
+                "input_dim": 128,
+                "flash": False,
+                "filter_threshold": 0.2,
+            },
+        },
     },
 }

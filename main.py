@@ -265,6 +265,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pixsfm_max_imgs", type=int, default=9999, help="max number of images for PixSfM"
     )
+    parser.add_argument(
+        "--pixsfm_low_mem_threshold", type=int, default=50, help="low mem threshold for PixSfM"
+    )
     parser.add_argument("--pixsfm_config", type=str, default="low_memory", help="PixSfM config")
     parser.add_argument(
         "--pixsfm_script_path", type=str, default="run_pixsfm.py", help="PixSfM script path"

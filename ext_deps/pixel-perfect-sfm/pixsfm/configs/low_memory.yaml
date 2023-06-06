@@ -42,7 +42,7 @@ mapping:
             refine_focal_length: false
             refine_principal_point: false
             refine_extra_params: false
-            refine_extrinsics: false
+            refine_extrinsics: True
 localization:
     dense_features: ${..dense_features}
     interpolation: ${..interpolation}

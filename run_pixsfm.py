@@ -36,7 +36,12 @@ else:
 mapper_options = pycolmap.IncrementalMapperOptions()
 mapper_options.min_model_size = 6
 
-refiner = PixSfM(conf=OmegaConf.load(pixsfm.configs.parse_config_path(args.pixsfm_config)))
+
+conf = OmegaConf.load(pixsfm.configs.parse_config_path(args.pixsfm_config))
+
+# conf.mapping.BA.optimizer.refine_extrinsics = True
+
+refiner = PixSfM(conf=conf)
 sparse_model, _ = refiner.run(
     output_dir=Path(args.sfm_dir),
     image_dir=Path(args.image_dir),

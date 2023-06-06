@@ -320,6 +320,12 @@ class Pipeline:
             if not self.paths.cache.exists():
                 self.paths.cache.mkdir(parents=True)
 
+            pixsfm_config_name = (
+                "low_memory"
+                if len(self.img_list) > self.args.pixsfm_low_mem_threshold
+                else self.args.pixsfm_config
+            )
+
             proc = subprocess.Popen(
                 [
                     "python",
@@ -337,7 +343,7 @@ class Pipeline:
                     "--cache_path",
                     str(self.paths.cache),
                     "--pixsfm_config",
-                    self.pixsfm_config,
+                    pixsfm_config_name,
                     "--camera_mode",
                     "auto" if camera_mode == pycolmap.CameraMode.AUTO else "single",
                 ],
