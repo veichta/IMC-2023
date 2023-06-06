@@ -216,6 +216,16 @@ class FlashAttention(nn.Module):
         return flash_attn_qkvpacked_func(torch.stack([q, k, v], 2).half()).to(q.dtype)
 
 
+class TorchFlashAttention(nn.Module):
+    def __init__(self, dim: int):
+        super().__init__()
+        self.scale = dim ** -0.5
+
+    def forward(self, q, k, v, weights=None):
+        with torch.backends.cuda.sdp_kernel(enable_flash=True, enable_math=True, enable_mem_efficient=False):
+            args = [x.bfloat16().transpose(1, 2).contiguous() for x in [q, k, v]]
+            return F.scaled_dot_product_attention(*args).to(q.dtype).transpose(1, 2)
+
 class Transformer(nn.Module):
     def __init__(self, embed_dim, num_heads, flash=False, bias=True) -> None:
         super().__init__()
@@ -227,7 +237,7 @@ class Transformer(nn.Module):
 
         self.Wqkv = nn.Linear(embed_dim, 3*embed_dim, bias=bias)
 
-        attn = FlashAttention if flash else FastAttention
+        attn = TorchFlashAttention if flash else FastAttention
         self.inner_attn = attn(self.head_dim)
 
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
@@ -289,7 +299,7 @@ class CrossTransformer(nn.Module):
         )
 
         if flash:
-            self.flash = flash_attn_kvpacked_func
+            self.flash = TorchFlashAttention(dim_head)
         else:
             self.flash = None
 
@@ -311,8 +321,10 @@ class CrossTransformer(nn.Module):
             # @TODO: Add bidirectional flash attn kernel
             qk0, qk1, v0, v1 = [x.bfloat16().transpose(1, 2)
                                 for x in [qk0, qk1, v0, v1]]
-            m0 = self.flash(qk0, torch.stack([qk1, v1], 2))
-            m1 = self.flash(qk1, torch.stack([qk0, v0], 2))
+            # m0 = self.flash(qk0, torch.stack([qk1, v1], 2))
+            # m1 = self.flash(qk1, torch.stack([qk0, v0], 2))
+            m0 = self.flash(qk0, qk1, v1)
+            m1 = self.flash(qk1, qk0, v0)
             m0, m1 = [x.to(x0.dtype).transpose(1, 2) for x in [m0, m1]]
         else:
             qk0, qk1 = qk0 * self.scale**0.5, qk1 * self.scale**0.5
