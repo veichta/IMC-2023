@@ -355,7 +355,7 @@ class Pipeline:
                 match_crop_path.unlink()
 
             extract_features.main(
-                conf=self.config["features"][0] if self.is_ensemble else self.config["features"],
+                conf=self.config["features"][0],
                 image_dir=self.paths.cropped_image_dir,
                 image_list=p,
                 feature_path=feat_crop_path,
@@ -365,7 +365,7 @@ class Pipeline:
                 f.write(f"{p[0]} {p[1]}\n")
 
             match_features.main(
-                conf=self.config["matches"][0] if self.is_ensemble else self.config["matches"],
+                conf=self.config["matches"][0],
                 pairs=self.paths.cropped_features_dir / f"tmp_pairs.txt",
                 features=self.paths.cropped_features_dir / f"{p[0]}_{p[1]}.h5",
                 matches=self.paths.cropped_matches_dir / f"{p[0]}_{p[1]}.h5",
@@ -608,6 +608,9 @@ class Pipeline:
                 logging.warning("Could not reconstruct model with PixSfM.")
                 self.sparse_model = None
         else:
+            mapper_options = pycolmap.IncrementalMapperOptions()
+            mapper_options.min_model_size = 6
+
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
                 image_dir=image_dir,

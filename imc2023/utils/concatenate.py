@@ -77,10 +77,10 @@ def reverse_matches(
     rev_matches = np.ones(num_kpts2) * -1
     rev_scores = np.zeros(num_kpts2)
 
-    # assert (
-    #     len(matches) == num_kpts1
-    # ), f"Number of matches must equal number of keypoints in image 1 ({len(matches)} != {num_kpts1})"
-    # assert np.max(matches) < num_kpts2, "Matches must be indices of keypoints in image 2"
+    assert (
+        len(matches) == num_kpts1
+    ), f"Number of matches must equal number of keypoints in image 1 ({len(matches)} != {num_kpts1})"
+    assert np.max(matches) < num_kpts2, "Matches must be indices of keypoints in image 2"
 
     # matches is a list of length nkps1 with each value being either -1 or the index of the match in
     # nkps2
@@ -140,7 +140,13 @@ def concat_matches(
                 # logging.info(f"Pairs in matches2: {len(list_h5_names(matches2_path))}")
                 # logging.info(f"Pairs2: {list_h5_names(matches2_path)}")
 
-                p2 = list_h5_names(matches2_path)[0]
+                # p2 = list_h5_names(matches2_path)[0]
+
+                keys1 = list_h5_names(matches1_path)
+                keys1 = [sorted(p.split("/"))[0] + "/" + sorted(p.split("/"))[1] for p in keys1]
+
+                keys2 = list_h5_names(matches2_path)
+                keys2 = [sorted(p.split("/"))[0] + "/" + sorted(p.split("/"))[1] for p in keys2]
 
                 for pair in tqdm(pairs, desc="concatenating matches", ncols=80):
                     name0, name1 = pair.split("/")
@@ -151,20 +157,44 @@ def concat_matches(
                     if name1 not in ensemble_matches[name0]:
                         ensemble_matches[name0][name1] = {}
 
-                    # get matches1
-                    # if pair == p2:
-                    # logging.info(
-                    #     f"Pair: {pair} -> ({name0}, {name1}) in p2: {name0 in p2}, {name1 in p2}"
-                    # )
-                    # logging.info(f"Counts0: {ensemble_features[name0]['counts'][:]}")
-                    # logging.info(f"Counts1: {ensemble_features[name1]['counts'][:]}")
-                    # logging.info(f"Matches1: {matches1[pair]['matches0']}")
-                    # logging.info(f"Matches2: {matches2[pair]['matches0']}")
+                    # assuming sorted keys
 
-                    m1, sc1 = extract_matches(matches1, ensemble_features, name0, name1, idx=0)
+                    # if pair in matches.keys() and in matches2.keys()
+                    # => simply concatenate
+                    if pair in keys1 and pair in keys2:
+                        # get matches1
+                        m1, sc1 = extract_matches(matches1, ensemble_features, name0, name1, idx=0)
 
-                    # get matches2
-                    m2, sc2 = extract_matches(matches2, ensemble_features, name0, name1, idx=1)
+                        # get matches2
+                        m2, sc2 = extract_matches(matches2, ensemble_features, name0, name1, idx=1)
+
+                    # if pair in matches.keys() and name0 in matches2.keys()[0, :]
+                    # => add matches [-1] * (num_kpts in name1) i.e. no matches
+                    elif pair in keys1 and name0 in [k[0] for k in keys2]:
+                        # get matches1
+                        m1, sc1 = extract_matches(matches1, ensemble_features, name0, name1, idx=0)
+
+                        # number of keypoints added to name0
+                        kpts = ensemble_features[name0]["counts"][1]
+
+                        m2 = np.ones(kpts) * -1
+                        sc2 = np.zeros(kpts)
+
+                    # if if pair in matches.keys() and not in matches2.keys()
+                    # => no change
+
+                    # if pair in matches.keys() and name1 in matches2.keys()[0, :]
+                    # => no change
+
+                    elif pair in keys1:
+                        # get matches1
+                        m1, sc1 = extract_matches(matches1, ensemble_features, name0, name1, idx=0)
+
+                        m2 = np.empty((0,))
+                        sc2 = np.empty((0,))
+
+                    else:
+                        raise ValueError(f"Pair {pair} not found in matches1 or matches2")
 
                     # concat matches
                     offset = ensemble_features[name1]["counts"][0]

@@ -170,6 +170,10 @@ def main(args):
 
             start_scene = time.time()
 
+            if args.skip_scenes is not None and scene in args.skip_scenes and args.mode == "train":
+                logging.info(f"Skipping {dataset} - {scene}")
+                continue
+
             # SETUP PATHS
             paths = DataPaths(
                 data_dir=data_dir,
@@ -290,6 +294,9 @@ if __name__ == "__main__":
     parser.add_argument("--shared_camera", action="store_true", help="use shared camera intrinsics")
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
     parser.add_argument("--kaggle", action="store_true", help="kaggle mode")
+    parser.add_argument("--cropping", action="store_true", help="use cropping")
+    parser.add_argument("--max_rel_crop_size", type=float, default=0.40, help="max crop size")
+    parser.add_argument("--min_rel_crop_size", type=float, default=0.05, help="min crop size")
     parser.add_argument("--skip_scenes", nargs="+", help="scenes to skip")
     args = parser.parse_args()
 
