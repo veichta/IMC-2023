@@ -1,5 +1,6 @@
 """Abstract pipeline class."""
 import argparse
+import gc
 import logging
 import shutil
 import subprocess
@@ -314,6 +315,7 @@ class Pipeline:
         logging.info(f"Using matches from {self.paths.matches_path}")
         logging.info(f"Using {camera_mode}")
 
+        gc.collect()
         if pixsfm:
             logging.info("Using PixSfM")
 
@@ -325,6 +327,8 @@ class Pipeline:
                 if len(self.img_list) > self.args.pixsfm_low_mem_threshold
                 else self.args.pixsfm_config
             )
+
+            logging.info(f"Using PixSfM config {pixsfm_config_name}")
 
             proc = subprocess.Popen(
                 [
@@ -389,6 +393,8 @@ class Pipeline:
 
         if self.sparse_model is not None:
             self.sparse_model.write(self.paths.sfm_dir)
+
+        gc.collect()
 
     def localize_unregistered(self) -> None:
         """Try to localize unregistered images."""

@@ -263,10 +263,17 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=str, default="outputs", help="output dir")
     parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
     parser.add_argument(
-        "--pixsfm_max_imgs", type=int, default=9999, help="max number of images for PixSfM"
+        "--pixsfm_max_imgs",
+        type=int,
+        default=9999,
+        help="max number of images for PixSfM",
     )
     parser.add_argument(
-        "--pixsfm_low_mem_threshold", type=int, default=50, help="low mem threshold for PixSfM"
+        "--pixsfm_low_mem_threshold",
+        type=int,
+        default=50,
+        required=True,
+        help="low mem threshold for PixSfM",
     )
     parser.add_argument("--pixsfm_config", type=str, default="low_memory", help="PixSfM config")
     parser.add_argument(
