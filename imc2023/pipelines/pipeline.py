@@ -1,5 +1,6 @@
 """Abstract pipeline class."""
 import argparse
+import gc
 import logging
 import shutil
 import subprocess
@@ -74,21 +75,20 @@ class Pipeline:
         self.max_rel_crop_size = args.max_rel_crop_size
         self.min_rel_crop_size = args.min_rel_crop_size
         self.overwrite = args.overwrite
+        self.same_shapes = False
         self.args = args
 
         self.sparse_model = None
         self.rotated_sparse_model = None
 
-        self.is_ensemble = type(self.config["features"]) == list
+        self.is_ensemble = len(self.config["features"]) > 1
         if self.is_ensemble:
             assert len(self.config["features"]) == len(
                 self.config["matches"]
             ), "Number of features and matches must be equal for ensemble matching."
-            assert (
-                len(self.config["features"]) == 2
-            ), "Only two features are supported for ensemble matching."
 
         self.rotation_angles = {}
+        self.n_rotated = 0
 
         self.timing = {
             "preprocess": 0,
@@ -101,6 +101,11 @@ class Pipeline:
             "localize_unregistered": 0,
             "back-rotate-cameras": 0,
         }
+
+        # log data paths
+        logging.info("Data paths:")
+        for key, value in self.paths.__dict__.items():
+            logging.info(f"  {key}: {value}")
 
     def log_step(self, title: str) -> None:
         """Log a title.
@@ -115,7 +120,8 @@ class Pipeline:
     def preprocess(self) -> None:
         """Preprocess the images."""
         self.log_step("Preprocessing")
-        self.rotation_angles = preprocess_image_dir(
+
+        self.rotation_angles, self.same_shapes = preprocess_image_dir(
             input_dir=self.paths.input_dir,
             output_dir=self.paths.scene_dir,
             image_list=self.img_list,
@@ -164,36 +170,51 @@ class Pipeline:
 
     def create_ensemble(self) -> None:
         """Concatenate features and matches."""
-        if not self.is_ensemble:
-            return
-
         self.log_step("Creating ensemble")
+
+        if not self.is_ensemble:
+            logging.info("Not using ensemble matching")
+            return
 
         feature_path = self.paths.features_path
         if self.use_rotation_matching:
             feature_path = self.paths.rotated_features_path
 
-        fpath1 = self.paths.features_path.parent / f'{self.config["features"][0]["output"]}.h5'
-        fpath2 = self.paths.features_path.parent / f'{self.config["features"][1]["output"]}.h5'
-
-        concat_features(
-            features1=fpath1,
-            features2=fpath2,
-            out_path=feature_path,
+        # copy first feature and matches to final output
+        shutil.copyfile(
+            self.paths.features_path.parent / f'{self.config["features"][0]["output"]}.h5',
+            feature_path,
+        )
+        shutil.copyfile(
+            self.paths.matches_path.parent / f'{self.config["matches"][0]["output"]}.h5',
+            self.paths.matches_path,
         )
 
-        mpath1 = self.paths.matches_path.parent / f'{self.config["matches"][0]["output"]}.h5'
-        mpath2 = self.paths.matches_path.parent / f'{self.config["matches"][1]["output"]}.h5'
+        # concatenate features and matches for remaining features and matches
+        for i in range(1, len(self.config["features"])):
+            feat_path = (
+                self.paths.features_path.parent / f'{self.config["features"][i]["output"]}.h5'
+            )
+            match_path = (
+                self.paths.matches_path.parent / f'{self.config["matches"][i]["output"]}.h5'
+            )
 
-        concat_matches(
-            matches1_path=mpath1,
-            matches2_path=mpath2,
-            ensemble_features_path=feature_path,
-            out_path=self.paths.matches_path,
-        )
+            concat_features(
+                features1=feature_path,
+                features2=feat_path,
+                out_path=feature_path,
+            )
 
+            concat_matches(
+                matches1_path=self.paths.matches_path,
+                matches2_path=match_path,
+                ensemble_features_path=feature_path,
+                out_path=self.paths.matches_path,
+            )
+
+        # write pairs file
+        # TODO: check if this is necessary
         pairs = sorted(list(list_h5_names(self.paths.matches_path)))
-
         with open(self.paths.pairs_path, "w") as f:
             for pair in pairs:
                 p = pair.split("/")
@@ -423,9 +444,16 @@ class Pipeline:
 
     def back_rotate_cameras(self):
         """Rotate R and t for each rotated camera."""
-        if not self.use_rotation_wrapper:
-            return
+        """Rotate R and t for each rotated camera."""
         self.log_step("Back-rotate camera poses")
+        if not self.use_rotation_wrapper:
+            logging.info("Not using rotation wrapper")
+            return
+
+        if self.sparse_model is None:
+            logging.info("No sparse model reconstructed, skipping back-rotation")
+            return
+
         for id, im in self.sparse_model.images.items():
             angle = self.rotation_angles[im.name]
             if angle != 0:
@@ -438,17 +466,19 @@ class Pipeline:
                 self.sparse_model.images[id].tvec = rotmat @ t
                 self.sparse_model.images[id].qvec = rotmat2qvec(rotmat @ R)
         # self.sparse_model.write(self.paths.sfm_dir)
+
         # swap the two image folders
-        image_dir = self.paths.rotated_image_dir
-        self.paths.rotated_image_dir = self.paths.image_dir
-        self.paths.image_dir = image_dir
+        # image_dir = self.paths.rotated_image_dir
+        # self.paths.rotated_image_dir = self.paths.image_dir
+        # self.paths.image_dir = image_dir
 
     def rotate_keypoints(self) -> None:
         """Rotate keypoints back after the rotation matching."""
-        if not self.use_rotation_matching:
-            return
-
         self.log_step("Rotating keypoints")
+
+        if not self.use_rotation_matching:
+            logging.info("Not using rotation matching")
+            return
 
         logging.info(f"Using rotated features from {self.paths.rotated_features_path}")
         shutil.copy(self.paths.rotated_features_path, self.paths.features_path)
@@ -458,6 +488,8 @@ class Pipeline:
             for image_fn, angle in self.rotation_angles.items():
                 if angle == 0:
                     continue
+
+                self.n_rotated += 1
 
                 keypoints = f[image_fn]["keypoints"].__array__()
                 y_max, x_max = cv2.imread(str(self.paths.rotated_image_dir / image_fn)).shape[:2]
@@ -492,16 +524,44 @@ class Pipeline:
             except ValueError:
                 self.sparse_model = None
 
-        logging.info(f"Using images from {self.paths.image_dir}")
+        # read images from rotated image dir if rotation wrapper is used
+        image_dir = (
+            self.paths.rotated_image_dir if self.use_rotation_wrapper else self.paths.image_dir
+        )
+
+        camera_mode = pycolmap.CameraMode.AUTO
+        if self.same_shapes and self.args.shared_camera:
+            camera_mode = pycolmap.CameraMode.SINGLE
+
+        pixsfm = (
+            self.use_pixsfm
+            and len(self.img_list) <= self.pixsfm_max_imgs
+            and (self.n_rotated == 0 or self.args.rotation_wrapper)
+        )
+
+        if self.n_rotated != 0 and self.use_pixsfm and not self.args.rotation_wrapper:
+            logging.info(f"Not using pixsfm because {self.n_rotated} rotated images are detected")
+
+        logging.info(f"Using images from {image_dir}")
         logging.info(f"Using pairs from {self.paths.pairs_path}")
         logging.info(f"Using features from {self.paths.features_path}")
         logging.info(f"Using matches from {self.paths.matches_path}")
+        logging.info(f"Using {camera_mode}")
 
-        if self.use_pixsfm and len(self.img_list) <= self.pixsfm_max_imgs:
+        gc.collect()
+        if pixsfm:
             logging.info("Using PixSfM")
 
             if not self.paths.cache.exists():
                 self.paths.cache.mkdir(parents=True)
+
+            pixsfm_config_name = (
+                "low_memory"
+                if len(self.img_list) > self.args.pixsfm_low_mem_threshold
+                else self.args.pixsfm_config
+            )
+
+            logging.info(f"Using PixSfM config {pixsfm_config_name}")
 
             proc = subprocess.Popen(
                 [
@@ -510,7 +570,7 @@ class Pipeline:
                     "--sfm_dir",
                     str(self.paths.sfm_dir),
                     "--image_dir",
-                    str(self.paths.image_dir),
+                    str(image_dir),
                     "--pairs_path",
                     str(self.paths.pairs_path),
                     "--features_path",
@@ -520,7 +580,9 @@ class Pipeline:
                     "--cache_path",
                     str(self.paths.cache),
                     "--pixsfm_config",
-                    self.pixsfm_config,
+                    pixsfm_config_name,
+                    "--camera_mode",
+                    "auto" if camera_mode == pycolmap.CameraMode.AUTO else "single",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -538,6 +600,9 @@ class Pipeline:
                     try:
                         self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
                     except ValueError:
+                        logging.warning(
+                            f"Could not reconstruct / read model from {self.paths.sfm_dir}."
+                        )
                         self.sparse_model = None
             except Exception:
                 logging.warning("Could not reconstruct model with PixSfM.")
@@ -545,16 +610,21 @@ class Pipeline:
         else:
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
-                image_dir=self.paths.image_dir,
+                image_dir=image_dir,
                 image_list=self.img_list,
                 pairs=self.paths.pairs_path,
                 features=self.paths.features_path,
                 matches=self.paths.matches_path,
-                verbose=True,
+                camera_mode=camera_mode,
+                verbose=False,
+                reference_model=self.paths.reference_model,
+                mapper_options=mapper_options.todict(),
             )
 
         if self.sparse_model is not None:
             self.sparse_model.write(self.paths.sfm_dir)
+
+        gc.collect()
 
     def localize_unregistered(self) -> None:
         """Try to localize unregistered images."""

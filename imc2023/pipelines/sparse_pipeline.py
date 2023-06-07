@@ -15,10 +15,9 @@ class SparsePipeline(Pipeline):
             image_dir = self.paths.rotated_image_dir
         elif self.use_rotation_wrapper:
             feature_path = self.paths.features_path
-            # swap the two image folders
             image_dir = self.paths.rotated_image_dir
-            self.paths.rotated_image_dir = self.paths.image_dir
-            self.paths.image_dir = image_dir
+            # self.paths.rotated_image_dir = self.paths.image_dir
+            # self.paths.image_dir = image_dir
         else:
             feature_path = self.paths.features_path
             image_dir = self.paths.image_dir
@@ -43,7 +42,7 @@ class SparsePipeline(Pipeline):
                 )
         else:
             extract_features.main(
-                conf=self.config["features"],
+                conf=self.config["features"][0],
                 image_dir=image_dir,
                 image_list=self.img_list,
                 feature_path=feature_path,
@@ -79,7 +78,7 @@ class SparsePipeline(Pipeline):
                 )
         else:
             match_features.main(
-                conf=self.config["matches"],
+                conf=self.config["matches"][0],
                 pairs=self.paths.pairs_path,
                 features=feature_path,
                 matches=self.paths.matches_path,

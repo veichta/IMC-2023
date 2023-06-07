@@ -136,7 +136,9 @@ def geometric_verification(
     matched = set()
     for name0 in tqdm(pairs):
         id0 = image_ids[name0]
-        image0 = reference.images[id0]
+        ref_id0 = reference.find_image_with_name(name0).image_id
+        # id0 = np.where(np.array([im.name for im in reference.images.values()]) == name0)[0][0]
+        image0 = reference.images[ref_id0]
         cam0 = reference.cameras[image0.camera_id]
         kps0, noise0 = get_keypoints(features_path, name0, return_uncertainty=True)
         noise0 = 1.0 if noise0 is None else noise0
@@ -147,7 +149,14 @@ def geometric_verification(
 
         for name1 in pairs[name0]:
             id1 = image_ids[name1]
-            image1 = reference.images[id1]
+            ref_id1 = reference.find_image_with_name(name1).image_id
+
+            # get id of name1
+            # id1 = np.where(np.array([im.name for im in reference.images.values()]) == name1)[0][0]
+            # print(f"names: {name0} -> {name1}")
+            # print(f"ids:   {id0} -> {id1}")
+
+            image1 = reference.images[ref_id1]
             cam1 = reference.cameras[image1.camera_id]
             kps1, noise1 = get_keypoints(features_path, name1, return_uncertainty=True)
             noise1 = 1.0 if noise1 is None else noise1
@@ -158,12 +167,18 @@ def geometric_verification(
 
             matches = get_matches(matches_path, name0, name1)[0]
 
-            if len({(id0, id1), (id1, id0)} & matched) > 0:
+            # print(f"Number of matches: {matches.shape[0]}")
+
+            if len({(ref_id0, ref_id1), (ref_id1, ref_id0)} & matched) > 0:
+                # print("Already matched.")
+                # print()
                 continue
-            matched |= {(id0, id1), (id1, id0)}
+            matched |= {(ref_id0, ref_id1), (ref_id1, ref_id0)}
 
             if matches.shape[0] == 0:
                 db.add_two_view_geometry(id0, id1, matches)
+                # print("No matches.")
+                # print()
                 continue
 
             qvec_01, tvec_01 = pycolmap.relative_pose(
@@ -176,10 +191,13 @@ def geometric_verification(
                 errors0 <= max_error * noise0 / cam0.mean_focal_length(),
                 errors1 <= max_error * noise1 / cam1.mean_focal_length(),
             )
+
+            # print(f"Number of valid matches: {len(valid_matches)}")
             # TODO: We could also add E to the database, but we need
             # to reverse the transformations if id0 > id1 in utils/database.py.
             db.add_two_view_geometry(id0, id1, matches[valid_matches, :])
             inlier_ratios.append(np.mean(valid_matches))
+            # print()
     logger.info(
         "mean/med/min/max valid matches %.2f/%.2f/%.2f/%.2f%%.",
         np.mean(inlier_ratios) * 100,

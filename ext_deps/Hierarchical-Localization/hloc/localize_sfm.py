@@ -138,8 +138,9 @@ def main(reference_sfm: Union[Path, pycolmap.Reconstruction],
     assert features.exists(), features
     assert matches.exists(), matches
 
-    queries = parse_image_lists(queries, with_intrinsics=True)
-    retrieval_dict = parse_retrieval(retrieval)
+    if not isinstance(queries, list):
+        queries = parse_image_lists(queries, with_intrinsics=True)
+    retrieval_dict = parse_retrieval(retrieval, bidirectional=True)
 
     logger.info('Reading the 3D model...')
     if not isinstance(reference_sfm, pycolmap.Reconstruction):
@@ -167,9 +168,10 @@ def main(reference_sfm: Union[Path, pycolmap.Reconstruction],
         db_ids = []
         for n in db_names:
             if n not in db_name_to_id:
-                logger.warning(f'Image {n} was retrieved but not in database')
+                # logger.warning(f'Image {n} was retrieved but not in database')
                 continue
-            db_ids.append(db_name_to_id[n])
+            else:
+                db_ids.append(db_name_to_id[n])
 
         if covisibility_clustering:
             clusters = do_covisibility_clustering(db_ids, reference_sfm)
@@ -220,6 +222,8 @@ def main(reference_sfm: Union[Path, pycolmap.Reconstruction],
     with open(logs_path, 'wb') as f:
         pickle.dump(logs, f)
     logger.info('Done!')
+
+    return logs
 
 
 if __name__ == '__main__':
