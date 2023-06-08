@@ -6,7 +6,7 @@ configs = {
             "model": {"name": "dog"},
             "options": {
                 "first_octave": -1,
-                "peak_threshold": 0.01,
+                "peak_threshold": 0.00667,  # 0.00667, # 0.01,
             },
             "output": "feats-sift",
             "preprocessing": {"grayscale": True, "resize_max": 1600},
@@ -30,9 +30,45 @@ configs = {
         "n_retrieval": 50,
     },
     "DISK": {
-        "features": extract_features.confs["disk"],
+        "features": {
+            "output": "feats-disk",
+            "model": {
+                "name": "disk",
+                "max_keypoints": 5000,
+            },
+            "preprocessing": {
+                "grayscale": False,
+                "resize_max": 1600,
+            },
+        },
         "matches": {
             "output": "matches-disk-lightglue",
+            "model": {
+                "name": "lightglue",
+                "weights": "disk_lightglue_legacy",
+                "input_dim": 128,
+                "flash": True,
+                "filter_threshold": 0.1,
+                "rotary": {
+                    "axial": True,
+                },
+            },
+        },
+    },
+    "DISK2K": {
+        "features": {
+            "output": "feats-disk2k",
+            "model": {
+                "name": "disk",
+                "max_keypoints": 2048,
+            },
+            "preprocessing": {
+                "grayscale": False,
+                "resize_max": 1600,
+            },
+        },
+        "matches": {
+            "output": "matches-disk2k-lightglue",
             "model": {
                 "name": "lightglue",
                 "weights": "disk_lightglue_legacy",
@@ -95,6 +131,58 @@ configs = {
             },
         },
     },
+    "SPv2S": {
+        "features": {
+            "output": "feats-superpointv2-n4096-r1024",
+            "model": {
+                "name": "superpoint_v2",
+                "max_num_keypoints": 4096,
+                "nms_radius": 8,
+                "detection_threshold": 0.000,
+                "weights": "sp_caps",
+            },
+            "preprocessing": {
+                "resize_max": 1024,
+                "resize_force": True,
+            },
+        },
+        "matches": {
+            "output": "matches-sp2-lightglue-S",
+            "model": {
+                "name": "lightglue",
+                "weights": "superpointv2_lightglue",
+                "input_dim": 128,
+                "flash": True,
+                "filter_threshold": 0.1,
+            },
+        },
+    },
+    "SPv2L": {
+        "features": {
+            "output": "feats-superpointv2-n4096-r1920",
+            "model": {
+                "name": "superpoint_v2",
+                "max_num_keypoints": 4096,
+                "nms_radius": 8,
+                "detection_threshold": 0.000,
+                "weights": "sp_caps",
+            },
+            "preprocessing": {
+                "resize_max": 1920,
+                "resize_force": True,
+            },
+        },
+        "matches": {
+            "output": "matches-sp2-lightglue-L",
+            "model": {
+                "name": "lightglue",
+                "weights": "superpointv2_lightglue",
+                "input_dim": 128,
+                "flash": True,
+                "filter_threshold": 0.1,
+            },
+        },
+    },
     "ALIKED": {
         "features": {
             "output": "feats-alikedn16",
@@ -112,6 +200,32 @@ configs = {
         },
         "matches": {
             "output": "matches-aliked-lightglue",
+            "model": {
+                "name": "lightglue",
+                "weights": "aliked_lightglue",
+                "input_dim": 128,
+                "flash": True,
+                "filter_threshold": 0.1,
+            },
+        },
+    },
+    "ALIKED2K": {
+        "features": {
+            "output": "feats-aliked2k",
+            "model": {
+                "name": "aliked",
+                "model_name": "aliked-n16",  # 'aliked-t16', 'aliked-n16', 'aliked-n16rot', 'aliked-n32'
+                "max_num_keypoints": 2048,
+                "detection_threshold": 0.0,
+                "force_num_keypoints": False,
+            },
+            "preprocessing": {
+                "resize_max": 1600,
+                # "resize_force": True,
+            },
+        },
+        "matches": {
+            "output": "matches-aliked2k-lightglue",
             "model": {
                 "name": "lightglue",
                 "weights": "aliked_lightglue",

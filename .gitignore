@@ -19,6 +19,9 @@ ext_deps/Hierarchical-Localization/third_party/LightGlue/weights/superpointv2_li
 ext_deps/Hierarchical-Localization/third_party/LightGlue/weights/aliked_lightglue.pth
 ext_deps/Hierarchical-Localization/third_party/sp_v2/sp_caps.tar
 
+wheels/pyceres-1.0-cp310-cp310-linux_x86_64.whl
+wheels/pycolmap-0.5.0-cp310-cp310-linux_x86_64.whl
+wheels/pixsfm-1.0.0-cp310-cp310-linux_x86_64.whl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
