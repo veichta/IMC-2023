@@ -1,5 +1,6 @@
 """Abstract pipeline class."""
 import argparse
+import gc
 import logging
 import shutil
 import subprocess
@@ -70,14 +71,11 @@ class Pipeline:
         self.sparse_model = None
         self.rotated_sparse_model = None
 
-        self.is_ensemble = type(self.config["features"]) == list
+        self.is_ensemble = len(self.config["features"]) > 1
         if self.is_ensemble:
             assert len(self.config["features"]) == len(
                 self.config["matches"]
             ), "Number of features and matches must be equal for ensemble matching."
-            assert (
-                len(self.config["features"]) == 2
-            ), "Only two features are supported for ensemble matching."
 
         self.rotation_angles = {}
         self.n_rotated = 0
@@ -93,6 +91,11 @@ class Pipeline:
             "localize_unregistered": 0,
             "back-rotate-cameras": 0,
         }
+
+        # log data paths
+        logging.info("Data paths:")
+        for key, value in self.paths.__dict__.items():
+            logging.info(f"  {key}: {value}")
 
     def log_step(self, title: str) -> None:
         """Log a title.
@@ -167,27 +170,41 @@ class Pipeline:
         if self.use_rotation_matching:
             feature_path = self.paths.rotated_features_path
 
-        fpath1 = self.paths.features_path.parent / f'{self.config["features"][0]["output"]}.h5'
-        fpath2 = self.paths.features_path.parent / f'{self.config["features"][1]["output"]}.h5'
-
-        concat_features(
-            features1=fpath1,
-            features2=fpath2,
-            out_path=feature_path,
+        # copy first feature and matches to final output
+        shutil.copyfile(
+            self.paths.features_path.parent / f'{self.config["features"][0]["output"]}.h5',
+            feature_path,
+        )
+        shutil.copyfile(
+            self.paths.matches_path.parent / f'{self.config["matches"][0]["output"]}.h5',
+            self.paths.matches_path,
         )
 
-        mpath1 = self.paths.matches_path.parent / f'{self.config["matches"][0]["output"]}.h5'
-        mpath2 = self.paths.matches_path.parent / f'{self.config["matches"][1]["output"]}.h5'
+        # concatenate features and matches for remaining features and matches
+        for i in range(1, len(self.config["features"])):
+            feat_path = (
+                self.paths.features_path.parent / f'{self.config["features"][i]["output"]}.h5'
+            )
+            match_path = (
+                self.paths.matches_path.parent / f'{self.config["matches"][i]["output"]}.h5'
+            )
 
-        concat_matches(
-            matches1_path=mpath1,
-            matches2_path=mpath2,
-            ensemble_features_path=feature_path,
-            out_path=self.paths.matches_path,
-        )
+            concat_features(
+                features1=feature_path,
+                features2=feat_path,
+                out_path=feature_path,
+            )
 
+            concat_matches(
+                matches1_path=self.paths.matches_path,
+                matches2_path=match_path,
+                ensemble_features_path=feature_path,
+                out_path=self.paths.matches_path,
+            )
+
+        # write pairs file
+        # TODO: check if this is necessary
         pairs = sorted(list(list_h5_names(self.paths.matches_path)))
-
         with open(self.paths.pairs_path, "w") as f:
             for pair in pairs:
                 p = pair.split("/")
@@ -298,11 +315,20 @@ class Pipeline:
         logging.info(f"Using matches from {self.paths.matches_path}")
         logging.info(f"Using {camera_mode}")
 
+        gc.collect()
         if pixsfm:
             logging.info("Using PixSfM")
 
             if not self.paths.cache.exists():
                 self.paths.cache.mkdir(parents=True)
+
+            pixsfm_config_name = (
+                "low_memory"
+                if len(self.img_list) > self.args.pixsfm_low_mem_threshold
+                else self.args.pixsfm_config
+            )
+
+            logging.info(f"Using PixSfM config {pixsfm_config_name}")
 
             proc = subprocess.Popen(
                 [
@@ -321,7 +347,7 @@ class Pipeline:
                     "--cache_path",
                     str(self.paths.cache),
                     "--pixsfm_config",
-                    self.pixsfm_config,
+                    pixsfm_config_name,
                     "--camera_mode",
                     "auto" if camera_mode == pycolmap.CameraMode.AUTO else "single",
                 ],
@@ -349,6 +375,9 @@ class Pipeline:
                 logging.warning("Could not reconstruct model with PixSfM.")
                 self.sparse_model = None
         else:
+            mapper_options = pycolmap.IncrementalMapperOptions()
+            mapper_options.min_model_size = 6
+
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
                 image_dir=image_dir,
@@ -358,10 +387,14 @@ class Pipeline:
                 matches=self.paths.matches_path,
                 camera_mode=camera_mode,
                 verbose=False,
+                reference_model=self.paths.reference_model,
+                mapper_options=mapper_options.todict(),
             )
 
         if self.sparse_model is not None:
             self.sparse_model.write(self.paths.sfm_dir)
+
+        gc.collect()
 
     def localize_unregistered(self) -> None:
         """Try to localize unregistered images."""

@@ -32,6 +32,12 @@ def setup_logger():
     filelock_logger = logging.getLogger("filelock")
     filelock_logger.setLevel(logging.ERROR)
 
+    urllib3_logger = logging.getLogger("urllib3")
+    urllib3_logger.setLevel(logging.ERROR)
+
+    h5py_logger = logging.getLogger("h5py")
+    h5py_logger.setLevel(logging.ERROR)
+
     warnings.filterwarnings(
         "ignore", category=FutureWarning, module="transformers.models.vit.feature_extraction_vit"
     )
@@ -173,6 +179,11 @@ class DataPaths:
         self.input_dir = Path(f"{data_dir}/{mode}/{dataset}/{scene}")
         self.scene_dir = output_dir / dataset / scene
         self.image_dir = self.scene_dir / "images"
+
+        # self.reference_model = self.input_dir / "sfm"
+        # if not self.reference_model.exists():
+        #     self.reference_model = None
+        self.reference_model = None
 
         self.sfm_dir = self.scene_dir / "sparse"
         self.pairs_path = self.scene_dir / "pairs.txt"

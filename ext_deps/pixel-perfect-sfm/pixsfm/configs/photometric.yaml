@@ -33,7 +33,7 @@ mapping:
             solver:
                 max_num_iterations: 30
             print_summary: false
-            refine_focal_length: false
+            refine_focal_length: True
             refine_principal_point: false
-            refine_extra_params: false
-            refine_extrinsics: false
+            refine_extra_params: True
+            refine_extrinsics: True
