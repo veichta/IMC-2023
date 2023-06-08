@@ -187,9 +187,7 @@ class DataPaths:
         # for image cropping
         self.cropping_dir = self.scene_dir / "cropping" # stores intermediate files for each pair
         self.cropped_image_dir = self.cropping_dir / "images"
-        self.cropped_pairs_path = self.cropping_dir / "pairs.txt"
         self.cropped_features_path = self.cropping_dir / "features.h5"
-        self.cropped_matches_path = self.cropping_dir / "matches.h5"
 
         # for pixsfm
         self.cache = output_dir / "cache"
