@@ -6,10 +6,8 @@ sys.path.append("ext_deps/Hierarchical-Localization")
 # for Kaggle
 sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/Hierarchical-Localization")
 
-# TODO: Remove this line
-sys.path.append("/kaggle/input/imc-23-repo-tmp/IMC-2023-TMP/ext_deps/Hierarchical-Localization")
-
 import argparse
+import logging
 from pathlib import Path
 
 import pixsfm
@@ -28,18 +26,27 @@ parser.add_argument("--pixsfm_config", type=str)
 parser.add_argument("--camera_mode", type=str, choices=["single", "auto"])
 args = parser.parse_args()
 
-if args.camera_mode == "single":
-    camera_mode = pycolmap.CameraMode.SINGLE
-else:
-    camera_mode = pycolmap.CameraMode.AUTO
 
-mapper_options = pycolmap.IncrementalMapperOptions()
-mapper_options.min_model_size = 6
+formatter = logging.Formatter(
+    fmt="[%(asctime)s %(name)s %(levelname)s] %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
+)
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+handler.setLevel(logging.DEBUG)
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+logger.addHandler(handler)
+logger.propagate = False
+
+
+logging.info(f"Running pixsfm with python: {sys.executable}")
 
 
 conf = OmegaConf.load(pixsfm.configs.parse_config_path(args.pixsfm_config))
 
 # conf.mapping.BA.optimizer.refine_extrinsics = True
+
 
 refiner = PixSfM(conf=conf)
 sparse_model, _ = refiner.run(
@@ -50,8 +57,7 @@ sparse_model, _ = refiner.run(
     matches_path=Path(args.matches_path),
     cache_path=Path(args.cache_path),
     verbose=False,
-    camera_mode=camera_mode,
-    mapper_options=mapper_options.todict(),
+    camera_mode=args.camera_mode,
 )
 
 if sparse_model is not None:

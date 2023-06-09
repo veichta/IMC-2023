@@ -330,9 +330,14 @@ class Pipeline:
 
             logging.info(f"Using PixSfM config {pixsfm_config_name}")
 
+            if self.args.kaggle:
+                python_path = "/kaggle/input/imc-23-repo/IMC-2023/venv/bin/python"
+            else:
+                python_path = "python"
+
             proc = subprocess.Popen(
                 [
-                    "python",
+                    python_path,
                     self.pixsfm_script_path,
                     "--sfm_dir",
                     str(self.paths.sfm_dir),

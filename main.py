@@ -255,7 +255,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--configs", type=str, required=True, nargs="+", choices=configs.keys(), help="configs"
     )
-    parser.add_argument("--retrieval", type=str, required=True, choices=["netvlad", "cosplace"])
+    parser.add_argument("--retrieval", type=str, default="netvlad", choices=["netvlad", "cosplace"])
     parser.add_argument("--n_retrieval", type=int, default=50, help="number of retrieval images")
     parser.add_argument(
         "--mode", type=str, required=True, choices=["train", "test"], help="train or test"
@@ -263,17 +263,10 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=str, default="outputs", help="output dir")
     parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
     parser.add_argument(
-        "--pixsfm_max_imgs",
-        type=int,
-        default=9999,
-        help="max number of images for PixSfM",
+        "--pixsfm_max_imgs", type=int, default=9999, help="max number of images for PixSfM"
     )
     parser.add_argument(
-        "--pixsfm_low_mem_threshold",
-        type=int,
-        default=50,
-        required=True,
-        help="low mem threshold for PixSfM",
+        "--pixsfm_low_mem_threshold", type=int, default=5, help="low mem threshold for PixSfM"
     )
     parser.add_argument("--pixsfm_config", type=str, default="low_memory", help="PixSfM config")
     parser.add_argument(
