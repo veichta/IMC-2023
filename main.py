@@ -51,6 +51,9 @@ from imc2023.utils.utils import (
 #     "pixsfm_script_path": "/kaggle/input/imc-23-repo/IMC-2023/run_pixsfm.py",
 #     "rotation_matching": True,
 #     "rotation_wrapper": False,
+#     "cropping": False,
+#     "max_rel_crop_size": 0.75,
+#     "min_rel_crop_size": 0.2,
 #     "resize": None,
 #     "shared_camera": True,
 #     "overwrite": True,
@@ -81,6 +84,8 @@ def get_output_dir(args: argparse.Namespace) -> Path:
         output_dir += "-rotwrap"
     if args.pixsfm:
         output_dir += "-pixsfm"
+    if args.cropping:
+        output_dir += "-crop"
     if args.resize is not None:
         output_dir += f"-{args.resize}px"
     if args.shared_camera:
@@ -272,7 +277,6 @@ if __name__ == "__main__":
         "--pixsfm_low_mem_threshold",
         type=int,
         default=50,
-        required=True,
         help="low mem threshold for PixSfM",
     )
     parser.add_argument("--pixsfm_config", type=str, default="low_memory", help="PixSfM config")
@@ -284,6 +288,13 @@ if __name__ == "__main__":
         "--rotation_wrapper",
         action="store_true",
         help="wrapper implementation of rotation matching",
+    )
+    parser.add_argument("--cropping", action="store_true", help="use image cropping")
+    parser.add_argument(
+        "--max_rel_crop_size", type=float, default=0.75, help="crops must have a smaller relative size"
+    )
+    parser.add_argument(
+        "--min_rel_crop_size", type=float, default=0.2, help="crops must have a larger relative size"
     )
     parser.add_argument("--resize", type=int, help="resize images")
     parser.add_argument("--shared_camera", action="store_true", help="use shared camera intrinsics")
