@@ -129,14 +129,14 @@ class Pipeline:
             return
         
         self.log_step("Cropping images")
-        crop_images(
+
+        # update image list as well
+        self.img_list = crop_images(
             paths=self.paths,
+            img_list=self.img_list,
             min_rel_crop_size=self.min_rel_crop_size,
             max_rel_crop_size=self.max_rel_crop_size,
         )
-
-        # update image list
-        self.img_list = [Path(p).name for p in self.paths.image_dir]
 
     def get_pairs(self) -> None:
         """Get pairs of images to match."""

@@ -291,10 +291,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("--cropping", action="store_true", help="use image cropping")
     parser.add_argument(
-        "--max_rel_crop_size", type=float, default=0.75, help="EITHER crop must have a smaller relative size"
+        "--max_rel_crop_size", type=float, default=0.75, help="crops must have a smaller relative size"
     )
     parser.add_argument(
-        "--min_rel_crop_size", type=float, default=0.2, help="BOTH crops must have a larger relative size"
+        "--min_rel_crop_size", type=float, default=0.2, help="crops must have a larger relative size"
     )
     parser.add_argument("--resize", type=int, help="resize images")
     parser.add_argument("--shared_camera", action="store_true", help="use shared camera intrinsics")

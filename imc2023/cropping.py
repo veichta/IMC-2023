@@ -31,10 +31,11 @@ def crop_is_valid(
 
 def crop_images(
     paths: DataPaths,
+    img_list: List[str],
     min_rel_crop_size: float,
     max_rel_crop_size: float,
-) -> None:
-    """Crop image and add them to the image directory.
+) -> List[str]:
+    """Crop image and add them to the image directory. Return updated image list.
 
     Args:
         paths (DataPaths): Data paths.
@@ -121,6 +122,9 @@ def crop_images(
                 crop_name = f"{img_1}_crop_{len(bounding_boxes[img_1])}.jpg"
                 cv2.imwrite(str(paths.image_dir / crop_name), cropped_image_1)
 
+                # add new image to image list
+                img_list.append(crop_name)
+
         if rel_size_2 >= min_rel_crop_size and rel_size_2 <= max_rel_crop_size:
             if img_2 not in bounding_boxes or crop_is_valid(bb_2, bounding_boxes[img_2]):
                 # save new bb coords
@@ -132,3 +136,8 @@ def crop_images(
                 # save new crop
                 crop_name = f"{img_2}_crop_{len(bounding_boxes[img_2])}.jpg"
                 cv2.imwrite(str(paths.image_dir / crop_name), cropped_image_2)
+
+                # add new image to image list
+                img_list.append(crop_name)
+
+    return img_list
