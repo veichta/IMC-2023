@@ -152,7 +152,7 @@ def add_guided_matches(database, pairs_path, features, matches, max_error=10.0):
             m0 = pred['matches0'][0].cpu().short().numpy()
 
             nm = matches0_to_matches(m0)
-            print(tvg['configuration_type'], image_id0, image_id1, nm.shape, tvg['inlier_matches'].shape)
+            # print(tvg['configuration_type'], image_id0, image_id1, nm.shape, tvg['inlier_matches'].shape)
             db.add_two_view_geometry(
                 image_id0, image_id1, nm,
                 tvg['F'], tvg['E'], tvg['H'], tvg['qvec'], tvg['tvec'])
