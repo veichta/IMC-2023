@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import time
 from abc import abstractmethod
+from pathlib import Path
 from typing import Any, Dict, List
 
 import cv2
@@ -323,7 +324,7 @@ class Pipeline:
                 self.paths.cache.mkdir(parents=True)
 
             pixsfm_config_name = (
-                "low_memory"
+                Path(self.args.pixsfm_config).parent / "low_memory"
                 if len(self.img_list) > self.args.pixsfm_low_mem_threshold
                 else self.args.pixsfm_config
             )
@@ -352,7 +353,7 @@ class Pipeline:
                     "--cache_path",
                     str(self.paths.cache),
                     "--pixsfm_config",
-                    pixsfm_config_name,
+                    str(pixsfm_config_name),
                     "--camera_mode",
                     "auto" if camera_mode == pycolmap.CameraMode.AUTO else "single",
                 ],
@@ -382,6 +383,7 @@ class Pipeline:
         else:
             mapper_options = pycolmap.IncrementalMapperOptions()
             mapper_options.min_model_size = 6
+            mapper_options.min_num_matches = 10
 
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
@@ -394,6 +396,7 @@ class Pipeline:
                 verbose=False,
                 reference_model=self.paths.reference_model,
                 mapper_options=mapper_options.todict(),
+                # skip_geometric_verification=True,
             )
 
         if self.sparse_model is not None:

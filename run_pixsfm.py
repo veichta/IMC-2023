@@ -43,7 +43,7 @@ logger.propagate = False
 logging.info(f"Running pixsfm with python: {sys.executable}")
 
 
-conf = OmegaConf.load(pixsfm.configs.parse_config_path(args.pixsfm_config))
+conf = OmegaConf.load(args.pixsfm_config)
 
 # conf.mapping.BA.optimizer.refine_extrinsics = True
 

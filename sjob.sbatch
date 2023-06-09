@@ -12,19 +12,19 @@
 
 #SBATCH --time=03:00:00
 
-#SBATCH --output="logs/ALIKED+SIFT.txt"
+#SBATCH --output="logs/out.txt"
 
 # run script
 python main.py \
     --data /cluster/scratch/veichta/image-matching-challenge-2023/ \
     --output /cluster/scratch/veichta/outputs/ \
     --mode train \
-    --config SIFT DISK \
+    --config SIFT DISK ALIKED2K \
     --rotation_matching \
     --shared_camera \
     --retrieval netvlad \
     --pixsfm \
-    --pixsfm_config low_memory \
+    --pixsfm_config ext_deps/pixel-perfect-sfm/pixsfm/configs/low_memory.yaml \
     --pixsfm_low_mem_threshold 5 \
     --overwrite
 # --skip dioscuri wall kyiv-puppet-theater \

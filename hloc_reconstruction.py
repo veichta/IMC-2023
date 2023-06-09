@@ -43,6 +43,7 @@ camera_mode = (
 
 mapper_options = pycolmap.IncrementalMapperOptions()
 mapper_options.min_model_size = 6
+mapper_options.min_num_matches = 10
 
 reconstruction.main(
     sfm_dir=Path(args.model_path),
@@ -53,4 +54,5 @@ reconstruction.main(
     mapper_options=mapper_options.todict(),
     camera_mode=camera_mode,
     verbose=False,
+    # skip_geometric_verification=True,
 )
