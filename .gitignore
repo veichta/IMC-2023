@@ -15,6 +15,10 @@ weights/**
 
 ext_deps/Hierarchical-Localization/third_party/LightGlue/weights/disk_lightglue_legacy.pth
 ext_deps/Hierarchical-Localization/third_party/LightGlue/weights/superpoint_lightglue.pth
+ext_deps/Hierarchical-Localization/third_party/LightGlue/weights/superpointv2_lightglue.pth
+ext_deps/Hierarchical-Localization/third_party/LightGlue/weights/aliked_lightglue.pth
+ext_deps/Hierarchical-Localization/third_party/sp_v2/sp_caps.tar
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

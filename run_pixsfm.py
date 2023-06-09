@@ -33,7 +33,15 @@ if args.camera_mode == "single":
 else:
     camera_mode = pycolmap.CameraMode.AUTO
 
-refiner = PixSfM(conf=OmegaConf.load(pixsfm.configs.parse_config_path(args.pixsfm_config)))
+mapper_options = pycolmap.IncrementalMapperOptions()
+mapper_options.min_model_size = 6
+
+
+conf = OmegaConf.load(pixsfm.configs.parse_config_path(args.pixsfm_config))
+
+# conf.mapping.BA.optimizer.refine_extrinsics = True
+
+refiner = PixSfM(conf=conf)
 sparse_model, _ = refiner.run(
     output_dir=Path(args.sfm_dir),
     image_dir=Path(args.image_dir),
@@ -43,6 +51,7 @@ sparse_model, _ = refiner.run(
     cache_path=Path(args.cache_path),
     verbose=False,
     camera_mode=camera_mode,
+    mapper_options=mapper_options.todict(),
 )
 
 if sparse_model is not None:
