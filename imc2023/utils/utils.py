@@ -196,9 +196,11 @@ class DataPaths:
         self.rotated_features_path = self.scene_dir / "features_rotated.h5"
 
         # for image cropping
-        self.cropping_dir = self.scene_dir / "cropping" # stores intermediate files for each pair
-        self.cropped_image_dir = self.cropping_dir / "images"
-        self.cropped_features_path = self.cropping_dir / "features.h5"
+        self.cropping_dir = self.scene_dir / "cropping"
+        self.cropping_pairs_path = self.cropping_dir / "pairs.txt"
+        self.cropping_features_retrieval = self.cropping_dir / "features_retrieval.h5"
+        self.cropping_features_path = self.cropping_dir / "features.h5"
+        self.cropping_matches_path = self.cropping_dir / "matches.h5"
 
         # for pixsfm
         self.cache = output_dir / "cache"
@@ -209,3 +211,4 @@ class DataPaths:
         self.sfm_dir.mkdir(parents=True, exist_ok=True)
         self.rotated_image_dir.mkdir(parents=True, exist_ok=True)
         self.cache.mkdir(parents=True, exist_ok=True)
+        self.cropping_dir.mkdir(parents=True, exist_ok=True)

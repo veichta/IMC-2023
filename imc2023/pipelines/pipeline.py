@@ -5,6 +5,7 @@ import logging
 import shutil
 import subprocess
 import time
+from pathlib import Path
 from abc import abstractmethod
 from typing import Any, Dict, List
 
@@ -15,7 +16,7 @@ import pycolmap
 from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
 from hloc.utils.io import list_h5_names
 
-from imc2023.cropping import crop_matching
+from imc2023.cropping import crop_images
 from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils import rot_mat_z, rotmat2qvec
 from imc2023.utils.concatenate import concat_features, concat_matches
@@ -122,6 +123,21 @@ class Pipeline:
             args=self.args,
         )
 
+    def perform_cropping(self):
+        """Crop images for each pair based on the overlap between the images."""
+        if not self.use_cropping:
+            return
+        
+        self.log_step("Cropping images")
+        crop_images(
+            paths=self.paths,
+            min_rel_crop_size=self.min_rel_crop_size,
+            max_rel_crop_size=self.max_rel_crop_size,
+        )
+
+        # update image list
+        self.img_list = [Path(p).name for p in self.paths.image_dir]
+
     def get_pairs(self) -> None:
         """Get pairs of images to match."""
         self.log_step("Get pairs")
@@ -213,20 +229,6 @@ class Pipeline:
             for pair in pairs:
                 p = pair.split("/")
                 f.write(f"{p[0]} {p[1]}\n")
-    
-    def match_crops(self):
-        """Crop images for each pair and use them to add additional matches."""
-        if not self.use_cropping:
-            return
-        
-        self.log_step("Performing crop matching")
-        crop_matching(
-            paths=self.paths,
-            config=self.config,
-            min_rel_crop_size=self.min_rel_crop_size,
-            max_rel_crop_size=self.max_rel_crop_size,
-            is_ensemble=self.is_ensemble,
-        )
 
     def back_rotate_cameras(self):
         """Rotate R and t for each rotated camera."""
@@ -422,11 +424,11 @@ class Pipeline:
         """Run the pipeline."""
         self.timing = {
             "preprocessing": time_function(self.preprocess)(),
+            "crop-images": time_function(self.perform_cropping)(),
             "pairs-extraction": time_function(self.get_pairs)(),
             "feature-extraction": time_function(self.extract_features)(),
             "feature-matching": time_function(self.match_features)(),
             "create-ensemble": time_function(self.create_ensemble)(),
-            "crop-matching": time_function(self.match_crops)(),
             "rotate-keypoints": time_function(self.rotate_keypoints)(),
             "sfm": time_function(self.sfm)(),
             "back-rotate-cameras": time_function(self.back_rotate_cameras)(),

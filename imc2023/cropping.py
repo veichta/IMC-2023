@@ -1,55 +1,82 @@
 import cv2
-import os
-import h5py
-import shutil
 import numpy as np
 from tqdm import tqdm
-from typing import Any, Dict
+from typing import List, Tuple
 
-from hloc import extract_features, match_features
+from hloc import extract_features, match_features, pairs_from_retrieval
 from hloc.utils.io import list_h5_names, get_matches, get_keypoints
 
+from imc2023.configs import configs
 from imc2023.utils.utils import DataPaths
 
 
-def crop_matching(
+def get_iou(box1: Tuple[int], box2: Tuple[int]) -> float:
+    intersection_area = max(0, min(box1[2], box2[2]) - max(box1[0], box2[0])) * max(0, min(box1[3], box2[3]) - max(box1[1], box2[1]))
+    box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union_area = box1_area + box2_area - intersection_area
+    return intersection_area / union_area
+
+
+def crop_is_valid(
+    new_bb: Tuple[int],
+    previous_bbs: List[Tuple[int]],
+    max_iou: float = 0.5,
+) -> bool:
+    for bb in previous_bbs:
+        if get_iou(new_bb, bb) > max_iou:
+            return False
+    return True
+
+
+def crop_images(
     paths: DataPaths,
-    config: Dict[str, Any],
     min_rel_crop_size: float,
     max_rel_crop_size: float,
-    is_ensemble: bool,
 ) -> None:
-    """Perform feature extraction on cropped images and add run matching on concatenated features.
+    """Crop image and add them to the image directory.
 
     Args:
         paths (DataPaths): Data paths.
-        config (Dict[str, Any]): Configs of the current run.
-        min_rel_crop_size (float): BOTH crops must have a larger relative size
-        max_rel_crop_size (float): EITHER crop must have a smaller relative size
-        is_ensemble (bool): Whether the current run is using an ensemble.
+        min_rel_crop_size (float): Crops must have a larger relative size
+        max_rel_crop_size (float): Crops must have a smaller relative size
     """
-    # initialize keypoints dictionary with original keypoints
-    keypoints_dict: Dict[str, Dict[str,np.ndarray]] = {} 
-    with h5py.File(str(paths.features_path), "r", libver="latest") as f:
-        for img in f.keys():
-            keypoints_dict[img] = {}
-            keypoints_dict[img]["keypoints"] = f[img]["keypoints"].__array__() # shape: (N, 2)
-            keypoints_dict[img]["descriptors"] = f[img]["descriptors"].__array__() # shape: (256, N)
-            keypoints_dict[img]["scores"] = f[img]["scores"].__array__() # shape: (N,)
-            keypoints_dict[img]["image_size"] = f[img]["image_size"].__array__() # shape: (2,)
+    # get top 10 netvlad pairs
+    extract_features.main(
+        conf=extract_features.confs["netvlad"],
+        image_dir=paths.image_dir,
+        feature_path=paths.cropping_features_retrieval,
+    )
+    pairs_from_retrieval.main(
+        descriptors=paths.cropping_features_retrieval,
+        num_matched=10,
+        output=paths.cropping_pairs_path,
+    )
 
-    # iterate through all original pairs and create crops
-    original_pairs = list(list_h5_names(paths.matches_path))
-    for pair in tqdm(original_pairs, desc="Processing pairs...", ncols=80):
+    # extract and match features using SIFT and NN-ratio
+    extract_features.main(
+        conf=configs["SIFT"]["features"],
+        image_dir=paths.image_dir,
+        feature_path=paths.cropping_features_path,
+    )
+    match_features.main(
+        conf=configs["SIFT"]["matches"],
+        pairs=paths.cropping_pairs_path,
+        features=paths.cropping_features_path,
+        matches=paths.cropping_matches_path,
+    )
+
+    bounding_boxes = {} # key: image name, value: list of tuples of bb coords
+
+    # iterate through candidate pairs and create crops
+    pairs = list(list_h5_names(paths.cropping_matches_path))
+    for pair in tqdm(pairs, desc="Processing pairs...", ncols=80):
         img_1, img_2 = pair.split("/")
 
-        # offsets to transform the keypoints from "crop spaces" to the original image spaces
-        offsets = {}
-
-        # get original keypoints and matches
-        kp_1 = get_keypoints(paths.features_path, img_1).astype(np.int32)
-        kp_2 = get_keypoints(paths.features_path, img_2).astype(np.int32)
-        matches, scores = get_matches(paths.matches_path, img_1, img_2)
+        # get keypoints and matches
+        kp_1 = get_keypoints(paths.cropping_features_path, img_1).astype(np.int32)
+        kp_2 = get_keypoints(paths.cropping_features_path, img_2).astype(np.int32)
+        matches, scores = get_matches(paths.cropping_matches_path, img_1, img_2)
 
         if len(matches) < 100:
             continue  # too few matches
@@ -62,95 +89,46 @@ def crop_matching(
         # compute bounding boxes based on the keypoints of the top 80% matches
         top_kp_1 = kp_1[top_matches[:, 0]]
         top_kp_2 = kp_2[top_matches[:, 1]]
+        # (x_min, y_min, x_max, y_max)
+        bb_1 = (top_kp_1[:, 0].min(), top_kp_1[:, 1].min(), top_kp_1[:, 0].max(), top_kp_1[:, 1].max())
+        bb_2 = (top_kp_2[:, 0].min(), top_kp_2[:, 1].min(), top_kp_2[:, 0].max(), top_kp_2[:, 1].max())
+
+        # crop original images
         original_image_1 = cv2.imread(str(paths.image_dir / img_1))
-        original_image_2 = cv2.imread(str(paths.image_dir / img_2))
         cropped_image_1 = original_image_1[
-            top_kp_1[:, 1].min() : top_kp_1[:, 1].max() + 1,
-            top_kp_1[:, 0].min() : top_kp_1[:, 0].max() + 1,
+            bb_1[1] : bb_1[3] + 1,
+            bb_1[0] : bb_1[2] + 1,
         ]
+        original_image_2 = cv2.imread(str(paths.image_dir / img_2))
         cropped_image_2 = original_image_2[
-            top_kp_2[:, 1].min() : top_kp_2[:, 1].max() + 1,
-            top_kp_2[:, 0].min() : top_kp_2[:, 0].max() + 1,
+            bb_2[1] : bb_2[3] + 1,
+            bb_2[0] : bb_2[2] + 1,
         ]
 
-        # check if the relative size conditions are fulfilled
+        # save crops if relative size and IoU conditions are fulfilled
         rel_size_1 = cropped_image_1.size / original_image_1.size
         rel_size_2 = cropped_image_2.size / original_image_2.size
 
-        if rel_size_1 <= min_rel_crop_size or rel_size_2 < min_rel_crop_size:
-            # one of the crops or both crops are too small ==> avoid degenerate crops
-            continue
+        if rel_size_1 >= min_rel_crop_size and rel_size_1 <= max_rel_crop_size:
+            if img_1 not in bounding_boxes or crop_is_valid(bb_1, bounding_boxes[img_1]):
+                # save new bb coords
+                if img_1 not in bounding_boxes:
+                    bounding_boxes[img_1] = [bb_1]
+                else:
+                    bounding_boxes[img_1].append(bb_1)
 
-        if rel_size_1 >= max_rel_crop_size and rel_size_2 >= max_rel_crop_size:
-            # both crops are almost the same size as the original images
-            # ==> crops are not useful (almost same matches as on the original images)
-            continue
+                # save new crop
+                crop_name = f"{img_1}_crop_{len(bounding_boxes[img_1])}.jpg"
+                cv2.imwrite(str(paths.image_dir / crop_name), cropped_image_1)
 
-        # delete temporary directory with intermediate files from previous pair
-        if os.path.exists(paths.cropping_dir):
-            shutil.rmtree(paths.cropping_dir)
+        if rel_size_2 >= min_rel_crop_size and rel_size_2 <= max_rel_crop_size:
+            if img_2 not in bounding_boxes or crop_is_valid(bb_2, bounding_boxes[img_2]):
+                # save new bb coords
+                if img_2 not in bounding_boxes:
+                    bounding_boxes[img_2] = [bb_2]
+                else:
+                    bounding_boxes[img_2].append(bb_2)
 
-        # set up new empty temporary directories and save crops
-        paths.cropping_dir.mkdir(parents=True, exist_ok=True)
-        paths.cropped_image_dir.mkdir(parents=True, exist_ok=True)
-        cv2.imwrite(str(paths.cropped_image_dir / img_1), cropped_image_1)
-        cv2.imwrite(str(paths.cropped_image_dir / img_2), cropped_image_2)
-
-        # save offsets for image space transformations
-        offsets[img_1] = (top_kp_1[:, 0].min(), top_kp_1[:, 1].min())
-        offsets[img_2] = (top_kp_2[:, 0].min(), top_kp_2[:, 1].min())
-
-        # extract features using the cropped images
-        conf = config["features"][0] if is_ensemble else config["features"]
-        # TODO: handle max_keypoints arg for other feature extractors than SuperPoint
-        conf["model"]["max_keypoints"] = 1024 # use less keypoints for crops...
-        extract_features.main(
-            conf=conf,
-            image_dir=paths.cropped_image_dir,
-            feature_path=paths.cropped_features_path,
-        )
-
-        # transform keypoints from cropped image spaces to original image spaces")
-        with h5py.File(str(paths.cropped_features_path), "r+", libver="latest") as f:
-            for name in [img_1, img_2]:
-                keypoints = f[name]["keypoints"].__array__()
-                keypoints[:, 0] += offsets[name][0]
-                keypoints[:, 1] += offsets[name][1]
-                f[name]["keypoints"][...] = keypoints
-
-        # add new keypoints and descriptors to dictionary
-        with h5py.File(str(paths.cropped_features_path), "r", libver="latest") as f:
-            for img in [img_1, img_2]:
-                keypoints_dict[img]["keypoints"] = np.concatenate(
-                    [keypoints_dict[img]["keypoints"], f[img]["keypoints"].__array__()],
-                    axis=0, # keypoints are stored row-wise
-                )
-                keypoints_dict[img]["descriptors"] = np.concatenate(
-                    [keypoints_dict[img]["descriptors"], f[img]["descriptors"].__array__()],
-                    axis=1, # descriptors are stored col-wise
-                )
-                keypoints_dict[img]["scores"] = np.concatenate(
-                    [keypoints_dict[img]["scores"], f[img]["scores"].__array__()],
-                    axis=0,
-                )
-
-    # save final keypoints
-    kp_ds = h5py.File(paths.features_path, "w")
-    for img in keypoints_dict:
-        kp_ds.create_group(img)
-        kp_ds[img].create_dataset("keypoints", data=keypoints_dict[img]["keypoints"])
-        kp_ds[img].create_dataset("descriptors", data=keypoints_dict[img]["descriptors"])
-        kp_ds[img].create_dataset("scores", data=keypoints_dict[img]["scores"])
-        kp_ds[img].create_dataset("image_size", data=keypoints_dict[img]["image_size"])
-    kp_ds.close()
-
-    # delete previous matching file such that the matching is not skipped
-    paths.matches_path.unlink()
-
-    # perform matching on ALL keypoints
-    match_features.main(
-        conf=config["matches"][0] if is_ensemble else config["matches"],
-        pairs=paths.pairs_path,
-        features=paths.features_path,
-        matches=paths.matches_path,
-    )
+                # save new crop
+                crop_name = f"{img_2}_crop_{len(bounding_boxes[img_2])}.jpg"
+                cv2.imwrite(str(paths.image_dir / crop_name), cropped_image_2)
