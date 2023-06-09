@@ -49,6 +49,8 @@ class NearestNeighbor(BaseModel):
             ratio_threshold = None
         sim = torch.einsum(
             'bdn,bdm->bnm', data['descriptors0'], data['descriptors1'])
+        if 'bias' in data.keys():
+            sim = sim + data['bias']
         matches0, scores0 = find_nn(
             sim, ratio_threshold, self.conf['distance_threshold'])
         if self.conf['do_mutual_check']:

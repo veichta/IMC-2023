@@ -41,6 +41,13 @@ def get_keypoints(path: Path, name: str,
     return p
 
 
+def get_features(path: Path, name: str) -> np.ndarray:
+    with h5py.File(str(path), 'r', libver='latest') as hfile:
+        p = hfile[name]['keypoints'].__array__()
+        d = hfile[name]['descriptors'].__array__()
+    return p, d
+
+
 def find_pair(hfile: h5py.File, name0: str, name1: str):
     pair = names_to_pair(name0, name1)
     if pair in hfile:

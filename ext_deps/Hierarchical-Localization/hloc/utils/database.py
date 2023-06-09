@@ -34,7 +34,7 @@
 import sys
 import sqlite3
 import numpy as np
-
+import pycolmap
 
 IS_PYTHON3 = sys.version_info[0] >= 3
 
@@ -206,7 +206,7 @@ class COLMAPDatabase(sqlite3.Connection):
         pair_id = image_ids_to_pair_id(image_id1, image_id2)
         matches = np.asarray(matches, np.uint32)
         self.execute(
-            "INSERT INTO matches VALUES (?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO matches VALUES (?, ?, ?, ?)",
             (pair_id,) + matches.shape + (array_to_blob(matches),))
 
     def add_two_view_geometry(self, image_id1, image_id2, matches,
@@ -227,11 +227,40 @@ class COLMAPDatabase(sqlite3.Connection):
         qvec = np.asarray(qvec, dtype=np.float64)
         tvec = np.asarray(tvec, dtype=np.float64)
         self.execute(
-            "INSERT INTO two_view_geometries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO two_view_geometries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (pair_id,) + matches.shape + (array_to_blob(matches), config,
              array_to_blob(F), array_to_blob(E), array_to_blob(H),
              array_to_blob(qvec), array_to_blob(tvec)))
 
+
+    def read_two_view_geometry(self, id0, id1):
+        pair_id = image_ids_to_pair_id(id0, id1)
+        rows = self.execute(f"SELECT * FROM two_view_geometries WHERE pair_id={pair_id}")
+
+        pair_id, m0, m1, matches, config, F, E, H, qvec, tvec = next(rows)
+        if pycolmap.TwoViewGeometry(config) == pycolmap.TwoViewGeometry.UNDEFINED:
+            return {
+                'configuration_type': pycolmap.TwoViewGeometry(config),
+            }
+
+        matches = blob_to_array(matches, np.uint32, shape=[m0, m1])
+
+        F = blob_to_array(F, np.float64, shape=[3, 3])
+        E = blob_to_array(E, np.float64, shape=[3, 3])
+        H = blob_to_array(H, np.float64, shape=[3, 3])
+
+        qvec = blob_to_array(qvec, np.float64)
+        tvec = blob_to_array(tvec, np.float64)
+
+        return {
+            'inlier_matches': matches,
+            'configuration_type': pycolmap.TwoViewGeometry(config),
+            'F': F,
+            'E': E,
+            'H': H,
+            'qvec': qvec,
+            'tvec': tvec
+        }
 
 def example_usage():
     import os

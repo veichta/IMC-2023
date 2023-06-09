@@ -61,6 +61,7 @@ class Pipeline:
         self.pixsfm_config = args.pixsfm_config
         self.pixsfm_script_path = args.pixsfm_script_path
         self.use_rotation_matching = args.rotation_matching
+        self.use_guided_matching = args.guided_matching
         self.overwrite = args.overwrite
         self.args = args
 
@@ -293,6 +294,7 @@ class Pipeline:
                 features=self.paths.features_path,
                 matches=self.paths.matches_path,
                 verbose=False,
+                guided_matching=self.use_guided_matching,
             )
 
         if self.sparse_model is not None:
