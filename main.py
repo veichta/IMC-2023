@@ -168,7 +168,7 @@ def main(args):
             logging.info(f"{dataset} - {scene}")
             logging.info("=" * 80)
 
-            if args.skip_scenes is not None and scene in args.skip_scenes and args.mode == "train":
+            if args.skip_scenes is not None and not scene in args.skip_scenes and args.mode == "train":
                 logging.info(f"Skipping {dataset} - {scene}")
                 continue
 
