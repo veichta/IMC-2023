@@ -435,6 +435,17 @@ class Pipeline:
             logging.info("Using HLoc keypoints")
             features = self.paths.features_path
 
+        est_conf = pycolmap.AbsolutePoseEstimationOptions()
+        est_conf.estimate_focal_length = True
+
+        refine_conf = pycolmap.AbsolutePoseRefinementOptions()
+        refine_conf.refine_focal_length = True
+        refine_conf.refine_extra_params = True
+
+        conf = {
+            "estimation": est_conf.todict(),
+            "refinement": refine_conf.todict(),
+        }
         logs = localize_sfm.main(
             self.sparse_model,
             queries,
@@ -443,6 +454,8 @@ class Pipeline:
             self.paths.matches_path,
             self.paths.scene_dir / "loc.txt",  # experiment_dir / "loc.txt",
             covisibility_clustering=True,
+            ransac_thresh=10,
+            config=conf,
         )
 
         max_len = max(len(x) for x in missing)
