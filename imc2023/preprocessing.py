@@ -214,25 +214,20 @@ def preprocess_image_dir(
         deep_orientation = dioad.infer.Inference(load_model_path=weights)
         
         k = min(len(image_list),100)
-
+        if k % 2==0:
+            k-=1
         diff = np.zeros(k)
         for i, image_fn in tqdm(enumerate(image_list[:k]), desc=f"Dioad {input_dir.name}", ncols=80):
             img_path = output_dir / "images" / image_fn
-            a = deep_orientation.predict("vit", str(img_path))
-            a = round(4-a/90)*90
-            diff[i] = a - rotation_angles[image_fn]
-
+            diff[i] = (deep_orientation.predict("vit", str(img_path)) - rotation_angles[image_fn]+180)%360 -180
         del deep_orientation
         gc.collect()
         np.set_printoptions(suppress=True, floatmode='fixed')
-          
-        from scipy.stats import mode
-        diff = diff %360
-        print(diff)
-        m =mode(diff,keepdims=False)[0]
+        print(diff)  
+        diff = np.median(diff)
 
-        for image_fn in rotation_angles.keys():
-            rotation_angles[image_fn]= (m+ rotation_angles[image_fn]) %360
+        for k in rotation_angles.keys():
+            rotation_angles[image_fn]= (360 -diff -  rotation_angles[image_fn]) %360
 
 
         for image_fn in tqdm(image_list, desc=f"Rotating {input_dir.name}", ncols=80):
