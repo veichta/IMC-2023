@@ -11,7 +11,7 @@ import numpy as np
 from tqdm import tqdm
 import cv2
 import networkx as nx
-import dioad.infer
+
 
 def get_match_matrix(features, matches):
     image_names = sorted(list_h5_names(features))
@@ -201,39 +201,11 @@ def preprocess_image_dir(
         
 
         rotation_angles = estimate_rot_from_sift(features, matches)
-        import tensorflow as tf
-
-        gpus = tf.config.experimental.list_physical_devices("GPU")
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-
-        weights = "ext_deps/dioad/weights/model-vit-ang-loss.h5"
-        if args.kaggle:
-            weights = f"/kaggle/input/imc-23-repo/IMC-2023/{weights}"
-
-        deep_orientation = dioad.infer.Inference(load_model_path=weights)
-        
-        k = min(len(image_list),100)
-        if k % 2==0:
-            k-=1
-        diff = np.zeros(k)
-        for i, image_fn in tqdm(enumerate(image_list[:k]), desc=f"Dioad {input_dir.name}", ncols=80):
-            img_path = output_dir / "images" / image_fn
-            diff[i] = (deep_orientation.predict("vit", str(img_path)) - rotation_angles[image_fn]+180)%360 -180
-        del deep_orientation
-        gc.collect()
-        np.set_printoptions(suppress=True, floatmode='fixed')
-        print(diff)  
-        diff = np.median(diff)
-
-        for k in rotation_angles.keys():
-            rotation_angles[image_fn]= (360 -diff -  rotation_angles[image_fn]) %360
-
 
         for image_fn in tqdm(image_list, desc=f"Rotating {input_dir.name}", ncols=80):
             img_path = output_dir / "images" / image_fn
             image = cv2.imread(str(img_path))
-            
+        
             angle = rotation_angles[image_fn]
             image, angle = get_rotated_image(image, angle)
 
