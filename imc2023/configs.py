@@ -361,7 +361,7 @@ configs = {
                 "weights": "aliked_lightglue",
                 "input_dim": 128,
                 "flash": True,
-                "filter_threshold": 0.01,
+                "filter_threshold": 0.2,
             },
         },
         "ALIKED2Kl": {
@@ -386,7 +386,7 @@ configs = {
                     "weights": "aliked_lightglue",
                     "input_dim": 128,
                     "flash": True,
-                    "filter_threshold": 0.2,
+                    "filter_threshold": 0.01,
                 },
             },
         },
