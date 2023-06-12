@@ -484,6 +484,10 @@ class Pipeline:
             )
 
             for q, v in logs["loc"].items():
+                if v["best_cluster"] is None:
+                    logging.info(f"Could not localize {q}")
+                    continue
+
                 v = v["log_clusters"][v["best_cluster"]]
                 n_inliers = v["PnP_ret"]["num_inliers"]
                 mean_inlier_dist = np.mean(list(v["PnP_ret"]["inliers"]))
