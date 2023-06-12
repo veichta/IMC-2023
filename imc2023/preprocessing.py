@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from hloc import extract_features, match_features, pairs_from_exhaustive
 from hloc.utils.io import list_h5_names, get_matches, get_keypoints
-
+from scipy.stats import circmean
 import os
 import numpy as np
 from tqdm import tqdm
@@ -32,7 +32,7 @@ def estimate_rot(name0,name1,features,matches):
     return np.rad2deg(angle), np.count_nonzero(inliers)
     
 
-def propagate_rotation(current_image, accumulated_rotation,rotation_values,visited,max_spanning_tree,image_names):
+def propagate_rotation(current_image, accumulated_rotation,rotation_values,visited,max_spanning_tree,image_names,features,matches):
     rotation_values[current_image] = accumulated_rotation
     neighbors = max_spanning_tree.neighbors(current_image)
     if visited[current_image]:
@@ -45,7 +45,7 @@ def propagate_rotation(current_image, accumulated_rotation,rotation_values,visit
             relative_rotation, _ =  estimate_rot(image_names[current_image], image_names[neighbor],features,matches)
             #show_img([current_image,neighbor],[round(rotation_values[current_image]/90) %4,round((rotation_values[current_image] + relative_rotation)/90) % 4],image_names)
             #plt.show()
-            propagate_rotation(neighbor, accumulated_rotation + relative_rotation,rotation_values,visited,max_spanning_tree,image_names)
+            propagate_rotation(neighbor, accumulated_rotation + relative_rotation,rotation_values,visited,max_spanning_tree,image_names,features,matches)
 
 def rotation_from_sift(features,matches):
     image_names = sorted(list_h5_names(features))
@@ -65,7 +65,7 @@ def rotation_from_sift(features,matches):
 
     rotation_values = np.zeros(n)  # Initialize rotation values
     visited = np.zeros(n)
-    propagate_rotation(0,0, rotation_values, visited, max_spanning_tree,image_names)
+    propagate_rotation(0,0, rotation_values, visited, max_spanning_tree,image_names,features,matches)
 
     offset90 = circmean(rotation_values,90)
     rotation_values -= offset90
