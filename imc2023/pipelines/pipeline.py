@@ -20,7 +20,9 @@ from hloc import (
     pairs_from_retrieval,
     reconstruction,
 )
+from hloc.utils.database import COLMAPDatabase, blob_to_array
 from hloc.utils.io import list_h5_names
+from hloc.utils.read_write_model import CAMERA_MODEL_NAMES
 
 from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils import rot_mat_z, rotmat2qvec
@@ -426,59 +428,78 @@ class Pipeline:
         if len(missing) == 0:
             return
 
-        queries = [(x, pycolmap.infer_camera_from_image(self.paths.image_dir / x)) for x in missing]
-
         if self.pixsfm and (self.paths.sfm_dir / "refined_keypoints.h5").exists():
             logging.info("Using PixSfM keypoints")
             features = self.paths.sfm_dir / "refined_keypoints.h5"
+            database_path = self.paths.sfm_dir / "hloc" / "database.db"
         else:
             logging.info("Using HLoc keypoints")
             features = self.paths.features_path
+            database_path = self.paths.sfm_dir / "database.db"
 
-        est_conf = pycolmap.AbsolutePoseEstimationOptions()
-        est_conf.estimate_focal_length = True
-
-        refine_conf = pycolmap.AbsolutePoseRefinementOptions()
-        refine_conf.refine_focal_length = True
-        refine_conf.refine_extra_params = True
-
-        conf = {
-            "estimation": est_conf.todict(),
-            "refinement": refine_conf.todict(),
-        }
-        logs = localize_sfm.main(
-            self.sparse_model,
-            queries,
-            self.paths.pairs_path,
-            features,
-            self.paths.matches_path,
-            self.paths.scene_dir / "loc.txt",  # experiment_dir / "loc.txt",
-            covisibility_clustering=True,
-            ransac_thresh=10,
-            config=conf,
-        )
-
-        max_len = max(len(x) for x in missing)
-        logging.info(
-            f"{'idx':>4}  {'Name':{max_len}}  {'Inliers':>4}  {'Mean inliers':>4}  {'DB kpts':>4}"
-        )
-        for idx, (q, v) in enumerate(logs["loc"].items()):
-            v = v["log_clusters"][v["best_cluster"]]
-            n_inliers = v["PnP_ret"]["num_inliers"]
-            mean_inlier_dist = np.mean(list(v["PnP_ret"]["inliers"]))
-            kpts_db = len(v["db"])
-            logging.info(
-                f"{idx:>4}  {q:{max_len}}  {n_inliers:>7}  {mean_inlier_dist:>12.1f}  {kpts_db:>7}"
+        db = COLMAPDatabase.connect(database_path)
+        for img_name in missing:
+            est_conf = pycolmap.AbsolutePoseEstimationOptions()
+            refine_conf = pycolmap.AbsolutePoseRefinementOptions()
+            ((image_id,),) = db.execute("SELECT image_id FROM images WHERE name=?", (img_name,))
+            ((camera_id,),) = db.execute(
+                "SELECT camera_id FROM images WHERE image_id=?", (image_id,)
             )
-            im = pycolmap.Image(
+
+            if camera_id in self.sparse_model.cameras:
+                # Just reuse a camera that was already optimized by one of the registered images.
+                logging.info(f"Found camera {camera_id} for {img_name} in initial model")
+                camera = self.sparse_model.cameras[camera_id]
+                logging.info(f"Using camera {camera_id} for {img_name} from initial model")
+            else:
+                # Infer initial parameters from EXIF and refine them.
+                camera = pycolmap.infer_camera_from_image(self.paths.image_dir / img_name)
+                camera.camera_id = camera_id
+                self.sparse_model.add_camera(camera)
+                logging.info(f"Inferring camera for {img_name}")
+
+                est_conf.estimate_focal_length = True
+                refine_conf.refine_focal_length = True
+                refine_conf.refine_extra_params = True
+
+            conf = {
+                "estimation": est_conf.todict(),
+                "refinement": refine_conf.todict(),
+            }
+
+            logging.info(f"localizing {img_name}")
+            q = [(img_name, camera)]
+
+            # localize
+            logs = localize_sfm.main(
+                self.sparse_model,
                 q,
-                tvec=v["PnP_ret"]["tvec"],
-                qvec=v["PnP_ret"]["qvec"],
-                camera_id=min(self.sparse_model.cameras),
-                id=max(self.sparse_model.images) + 1,
+                self.paths.pairs_path,
+                features,
+                self.paths.matches_path,
+                self.paths.scene_dir / "loc.txt",
+                covisibility_clustering=True,
+                ransac_thresh=10,
+                config=conf,
             )
-            im.registered = True
-            self.sparse_model.add_image(im)
+
+            for q, v in logs["loc"].items():
+                v = v["log_clusters"][v["best_cluster"]]
+                n_inliers = v["PnP_ret"]["num_inliers"]
+                mean_inlier_dist = np.mean(list(v["PnP_ret"]["inliers"]))
+                kpts_db = len(v["db"])
+                im = pycolmap.Image(
+                    q,
+                    tvec=v["PnP_ret"]["tvec"],
+                    qvec=v["PnP_ret"]["qvec"],
+                    id=image_id,
+                    camera_id=camera_id,
+                )
+                im.registered = True
+                self.sparse_model.add_image(im)
+                logging.info(
+                    f"added {q} with {n_inliers} inliers, mean inlier dist {mean_inlier_dist}, {kpts_db} db kpts"
+                )
 
         self.sparse_model.write(self.paths.sfm_dir)
 
