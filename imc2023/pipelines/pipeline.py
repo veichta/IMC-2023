@@ -5,6 +5,7 @@ import logging
 import shutil
 import subprocess
 import time
+from pathlib import Path
 from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List
@@ -24,6 +25,7 @@ from hloc.utils.database import COLMAPDatabase, blob_to_array
 from hloc.utils.io import list_h5_names
 from hloc.utils.read_write_model import CAMERA_MODEL_NAMES
 
+from imc2023.cropping import crop_images
 from imc2023.preprocessing import preprocess_image_dir
 from imc2023.utils import rot_mat_z, rotmat2qvec
 from imc2023.utils.concatenate import concat_features, concat_matches
@@ -73,6 +75,9 @@ class Pipeline:
         self.pixsfm_script_path = args.pixsfm_script_path
         self.use_rotation_matching = args.rotation_matching
         self.use_rotation_wrapper = args.rotation_wrapper
+        self.use_cropping = args.cropping
+        self.max_rel_crop_size = args.max_rel_crop_size
+        self.min_rel_crop_size = args.min_rel_crop_size
         self.overwrite = args.overwrite
         self.same_shapes = False
         self.args = args
@@ -125,6 +130,21 @@ class Pipeline:
             output_dir=self.paths.scene_dir,
             image_list=self.img_list,
             args=self.args,
+        )
+
+    def perform_cropping(self):
+        """Crop images for each pair based on the overlap between the images."""
+        if not self.use_cropping:
+            return
+        
+        self.log_step("Cropping images")
+
+        # update image list as well
+        self.img_list = crop_images(
+            paths=self.paths,
+            img_list=self.img_list,
+            min_rel_crop_size=self.min_rel_crop_size,
+            max_rel_crop_size=self.max_rel_crop_size,
         )
 
     def get_pairs(self) -> None:
@@ -511,6 +531,7 @@ class Pipeline:
         """Run the pipeline."""
         self.timing = {
             "preprocessing": time_function(self.preprocess)(),
+            "crop-images": time_function(self.perform_cropping)(),
             "pairs-extraction": time_function(self.get_pairs)(),
             "feature-extraction": time_function(self.extract_features)(),
             "feature-matching": time_function(self.match_features)(),
