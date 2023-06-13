@@ -59,7 +59,7 @@ class DoG(BaseModel):
         assert image_np.min() >= -EPS and image_np.max() <= 1 + EPS
 
         if self.sift is None:
-            use_gpu = pycolmap.has_cuda and self.device.type == 'cuda'
+            use_gpu = False  # pycolmap.has_cuda and self.device.type == 'cuda'
             options = {**self.conf["options"]}
             if self.conf["descriptor"] == "rootsift":
                 options["normalization"] = pycolmap.Normalization.L1_ROOT

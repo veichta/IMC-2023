@@ -7,14 +7,23 @@ import subprocess
 import time
 from pathlib import Path
 from abc import abstractmethod
+from pathlib import Path
 from typing import Any, Dict, List
 
 import cv2
 import h5py
 import numpy as np
 import pycolmap
-from hloc import extract_features, pairs_from_exhaustive, pairs_from_retrieval, reconstruction
+from hloc import (
+    extract_features,
+    localize_sfm,
+    pairs_from_exhaustive,
+    pairs_from_retrieval,
+    reconstruction,
+)
+from hloc.utils.database import COLMAPDatabase, blob_to_array
 from hloc.utils.io import list_h5_names
+from hloc.utils.read_write_model import CAMERA_MODEL_NAMES
 
 from imc2023.cropping import crop_images
 from imc2023.preprocessing import preprocess_image_dir
@@ -320,7 +329,7 @@ class Pipeline:
         if self.same_shapes and self.args.shared_camera:
             camera_mode = pycolmap.CameraMode.SINGLE
 
-        pixsfm = (
+        self.pixsfm = (
             self.use_pixsfm
             and len(self.img_list) <= self.pixsfm_max_imgs
             and (self.n_rotated == 0 or self.args.rotation_wrapper)
@@ -336,23 +345,28 @@ class Pipeline:
         logging.info(f"Using {camera_mode}")
 
         gc.collect()
-        if pixsfm:
+        if self.pixsfm:
             logging.info("Using PixSfM")
 
             if not self.paths.cache.exists():
                 self.paths.cache.mkdir(parents=True)
 
             pixsfm_config_name = (
-                "low_memory"
+                Path(self.args.pixsfm_config).parent / "low_memory.yaml"
                 if len(self.img_list) > self.args.pixsfm_low_mem_threshold
                 else self.args.pixsfm_config
             )
 
             logging.info(f"Using PixSfM config {pixsfm_config_name}")
 
+            if self.args.kaggle:
+                python_path = "/kaggle/working/venv/bin/python"
+            else:
+                python_path = "python"
+
             proc = subprocess.Popen(
                 [
-                    "python",
+                    python_path,
                     self.pixsfm_script_path,
                     "--sfm_dir",
                     str(self.paths.sfm_dir),
@@ -367,7 +381,7 @@ class Pipeline:
                     "--cache_path",
                     str(self.paths.cache),
                     "--pixsfm_config",
-                    pixsfm_config_name,
+                    str(pixsfm_config_name),
                     "--camera_mode",
                     "auto" if camera_mode == pycolmap.CameraMode.AUTO else "single",
                 ],
@@ -397,6 +411,7 @@ class Pipeline:
         else:
             mapper_options = pycolmap.IncrementalMapperOptions()
             mapper_options.min_model_size = 6
+            mapper_options.min_num_matches = 10
 
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
@@ -409,6 +424,7 @@ class Pipeline:
                 verbose=False,
                 reference_model=self.paths.reference_model,
                 mapper_options=mapper_options.todict(),
+                # skip_geometric_verification=True,
             )
 
         if self.sparse_model is not None:
@@ -418,7 +434,98 @@ class Pipeline:
 
     def localize_unregistered(self) -> None:
         """Try to localize unregistered images."""
-        pass
+        self.log_step("Localize unregistered images")
+
+        if self.sparse_model is None:
+            logging.info("No sparse model reconstructed, skipping localization")
+            return
+
+        reg_image_names = [im.name for imid, im in self.sparse_model.images.items()]
+
+        missing = list(set(self.img_list) - set(reg_image_names))
+        logging.info(f"Found {len(missing)} unregistered images")
+
+        if len(missing) == 0:
+            return
+
+        if self.pixsfm and (self.paths.sfm_dir / "refined_keypoints.h5").exists():
+            logging.info("Using PixSfM keypoints")
+            features = self.paths.sfm_dir / "refined_keypoints.h5"
+            database_path = self.paths.sfm_dir / "hloc" / "database.db"
+        else:
+            logging.info("Using HLoc keypoints")
+            features = self.paths.features_path
+            database_path = self.paths.sfm_dir / "database.db"
+
+        db = COLMAPDatabase.connect(database_path)
+        for img_name in missing:
+            est_conf = pycolmap.AbsolutePoseEstimationOptions()
+            refine_conf = pycolmap.AbsolutePoseRefinementOptions()
+            ((image_id,),) = db.execute("SELECT image_id FROM images WHERE name=?", (img_name,))
+            ((camera_id,),) = db.execute(
+                "SELECT camera_id FROM images WHERE image_id=?", (image_id,)
+            )
+
+            if camera_id in self.sparse_model.cameras:
+                # Just reuse a camera that was already optimized by one of the registered images.
+                logging.info(f"Found camera {camera_id} for {img_name} in initial model")
+                camera = self.sparse_model.cameras[camera_id]
+                logging.info(f"Using camera {camera_id} for {img_name} from initial model")
+            else:
+                # Infer initial parameters from EXIF and refine them.
+                camera = pycolmap.infer_camera_from_image(self.paths.image_dir / img_name)
+                camera.camera_id = camera_id
+                self.sparse_model.add_camera(camera)
+                logging.info(f"Inferring camera for {img_name}")
+
+                est_conf.estimate_focal_length = True
+                refine_conf.refine_focal_length = True
+                refine_conf.refine_extra_params = True
+
+            conf = {
+                "estimation": est_conf.todict(),
+                "refinement": refine_conf.todict(),
+            }
+
+            logging.info(f"localizing {img_name}")
+            q = [(img_name, camera)]
+
+            # localize
+            logs = localize_sfm.main(
+                self.sparse_model,
+                q,
+                self.paths.pairs_path,
+                features,
+                self.paths.matches_path,
+                self.paths.scene_dir / "loc.txt",
+                covisibility_clustering=True,
+                ransac_thresh=10,
+                config=conf,
+            )
+
+            for q, v in logs["loc"].items():
+                if v["best_cluster"] is None:
+                    logging.info(f"Could not localize {q}")
+                    continue
+
+                v = v["log_clusters"][v["best_cluster"]]
+                n_inliers = v["PnP_ret"]["num_inliers"]
+                mean_inlier_dist = np.mean(list(v["PnP_ret"]["inliers"]))
+                kpts_db = len(v["db"])
+                im = pycolmap.Image(
+                    q,
+                    tvec=v["PnP_ret"]["tvec"],
+                    qvec=v["PnP_ret"]["qvec"],
+                    id=image_id,
+                    camera_id=camera_id,
+                )
+                im.registered = True
+                self.sparse_model.add_image(im)
+                logging.info(
+                    f"added {q} with {n_inliers} inliers, mean inlier dist {mean_inlier_dist}, {kpts_db} db kpts"
+                )
+
+        self.sparse_model.write(self.paths.sfm_dir)
 
     def run(self) -> None:
         """Run the pipeline."""
