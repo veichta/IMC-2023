@@ -157,6 +157,30 @@ configs = {
             },
         },
     },
+    "SPh": {
+        "features": {
+            "output": "feats-superpoint-n4096-rmax1600",
+            "model": {
+                "name": "superpoint",
+                "nms_radius": 3,
+                "max_keypoints": 4096,
+            },
+            "preprocessing": {
+                "grayscale": True,
+                "resize_max": 1600,
+                "resize_force": True,
+            },
+        },
+        "matches": {
+            "output": "matches-sp-lightglue",
+            "model": {
+                "name": "lightglue",
+                "weights": "superpoint_lightglue",
+                "flash": True,
+                "filter_threshold": 0.2,
+            },
+        },
+    },
     "SPv2": {
         "features": {
             "output": "feats-superpointv2-n4096-r1600",
