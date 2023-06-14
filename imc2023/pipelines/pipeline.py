@@ -5,7 +5,6 @@ import logging
 import shutil
 import subprocess
 import time
-from pathlib import Path
 from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List
@@ -136,7 +135,7 @@ class Pipeline:
         """Crop images for each pair based on the overlap between the images."""
         if not self.use_cropping:
             return
-        
+
         self.log_step("Cropping images")
 
         # update image list as well
@@ -435,6 +434,10 @@ class Pipeline:
     def localize_unregistered(self) -> None:
         """Try to localize unregistered images."""
         self.log_step("Localize unregistered images")
+
+        if not self.args.localize_unregistered:
+            logging.info("Not localizing unregistered images")
+            return
 
         if self.sparse_model is None:
             logging.info("No sparse model reconstructed, skipping localization")
