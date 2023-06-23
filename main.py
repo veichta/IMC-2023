@@ -40,7 +40,7 @@ from imc2023.utils.utils import (
 
 # args = {
 #     "data": "/kaggle/input/image-matching-challenge-2023",
-#     "configs": ["SP+LG"],
+#     "configs": ["DISK+LG"],
 #     "retrieval": "netvlad",
 #     "n_retrieval": 50,
 #     "mode": "train",
