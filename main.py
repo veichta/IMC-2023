@@ -40,7 +40,7 @@ from imc2023.utils.utils import (
 
 # args = {
 #     "data": "/kaggle/input/image-matching-challenge-2023",
-#     "configs": ["SP+LG"],
+#     "configs": ["DISK+LG"],
 #     "retrieval": "netvlad",
 #     "n_retrieval": 50,
 #     "mode": "train",
@@ -58,6 +58,7 @@ from imc2023.utils.utils import (
 #     "shared_camera": True,
 #     "overwrite": True,
 #     "kaggle": True,
+#     "localize_unregistered" = False,
 #     "skip_scenes": None,
 # }
 
@@ -298,6 +299,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--resize", type=int, help="resize images")
     parser.add_argument("--shared_camera", action="store_true", help="use shared camera intrinsics")
+    parser.add_argument(
+        "--localize_unregistered", action="store_true", help="localize unregistered"
+    )
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing results")
     parser.add_argument("--kaggle", action="store_true", help="kaggle mode")
     parser.add_argument("--skip_scenes", nargs="+", help="scenes to skip")
