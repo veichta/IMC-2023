@@ -85,12 +85,16 @@ def get_output_dir(args: argparse.Namespace) -> Path:
         output_dir += "-rotwrap"
     if args.pixsfm:
         output_dir += "-pixsfm"
+    if args.pixsfm_force:
+        output_dir += "-pixsfm-force"
     if args.cropping:
         output_dir += "-crop"
     if args.resize is not None:
         output_dir += f"-{args.resize}px"
     if args.shared_camera:
         output_dir += "-sci"
+    if args.localize_unregistered:
+        output_dir += "-loc"
 
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -148,7 +152,7 @@ def main(args):
     metrics = {}
     out_results = {}
 
-    if config["features"] is not None:
+    if config["features"][0] is not None:
         from imc2023.pipelines.sparse_pipeline import SparsePipeline as Pipeline
     else:
         from imc2023.pipelines.dense_pipeline import DensePipeline as Pipeline
@@ -268,6 +272,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--output", type=str, default="outputs", help="output dir")
     parser.add_argument("--pixsfm", action="store_true", help="use pixsfm")
+    parser.add_argument("--pixsfm_force", action="store_true", help="force PixSfM")
     parser.add_argument(
         "--pixsfm_max_imgs", type=int, default=9999, help="max number of images for PixSfM"
     )

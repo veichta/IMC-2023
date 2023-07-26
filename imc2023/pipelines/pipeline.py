@@ -332,7 +332,7 @@ class Pipeline:
             self.use_pixsfm
             and len(self.img_list) <= self.pixsfm_max_imgs
             and (self.n_rotated == 0 or self.args.rotation_wrapper)
-        )
+        ) or self.args.pixsfm_force
 
         if self.n_rotated != 0 and self.use_pixsfm and not self.args.rotation_wrapper:
             logging.info(f"Not using pixsfm because {self.n_rotated} rotated images are detected")
