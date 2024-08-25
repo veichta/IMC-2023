@@ -1,4 +1,4 @@
-# 7th place Solution using a novel matcher LightGlue (2nd for price eligible)
+# 7th place Solution using a novel matcher LightGlue
 # Intro
 
 This is our solution for the [Image Matching Challenge 2023](https://www.kaggle.com/competitions/image-matching-challenge-2023/overview) where we took 7th place (2nd for price eligible solutions). We used a novel matcher called [LightGlue](https://github.com/cvg/LightGlue), which was developed here at ETH Zurich. LightGlue is a fast and accurate matcher that can be used for image retrieval and image matching. It is based on a transformer architecture and is trained on the MegaDepth dataset. We used LightGlue in combination with other feature extractors such as SIFT, DISK, and ALIKED to create an ensemble of matchers. We also used PixSfM to refine the reconstructions and the hloc toolbox to localize unregistered images. Using this pipeline, we were able to achieve a score of 0.529 (7th) on the private leaderboard while matching the score of 2nd place when using SuperPoint.
